@@ -24,7 +24,13 @@
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
     <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-        <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Activación de Licencia</h1>
+        <!-- Logo de SICAR AI -->
+        <div class="flex justify-center mb-6">
+            <img src="image_6c165e.png" alt="SICAR AI Logo" class="h-24 w-24 object-contain rounded-xl"
+                 onerror="this.onerror=null;this.src='https://placehold.co/96x96/aabbcc/ffffff?text=Logo';">
+        </div>
+        <!-- Título actualizado -->
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Activa tu licencia de SICAR AI</h1>
         <p class="text-gray-600 mb-6 text-center">Por favor, ingrese su clave de licencia alfanumérica de 16 dígitos para activar la aplicación.</p>
 
         <div class="mb-6">
@@ -205,17 +211,19 @@
                         licenseKeyInput.style.display = 'block'; // Mostrar input si no está activa
                     }
                 } else {
+                    // Si la respuesta no es OK (ej. 500, 403), también asegurarse de que la UI refleje "no activa"
                     displayMessage(data.detail || data.message || 'Error desconocido al verificar la licencia.', 'error');
-                    deactivateButton.style.display = 'none'; // Asegurarse de que esté oculto si hay error
-                    activateButton.style.display = 'block'; // Mostrar activar
-                    licenseKeyInput.style.display = 'block'; // Mostrar input
+                    deactivateButton.style.display = 'none'; 
+                    activateButton.style.display = 'block'; 
+                    licenseKeyInput.style.display = 'block'; 
                 }
             } catch (error) {
                 console.error('Error de red al verificar la licencia:', error);
+                // Si hay un error de red (servidor no accesible), también reflejar "no activa"
                 displayMessage('Error de conexión con el servidor al verificar el estado.', 'error');
-                deactivateButton.style.display = 'none'; // Asegurarse de que esté oculto si hay error
-                activateButton.style.display = 'block'; // Mostrar activar
-                licenseKeyInput.style.display = 'block'; // Mostrar input
+                deactivateButton.style.display = 'none'; 
+                activateButton.style.display = 'block'; 
+                licenseKeyInput.style.display = 'block'; 
             }
         }
 
