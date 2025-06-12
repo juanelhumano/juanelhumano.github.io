@@ -29,7 +29,8 @@
 
         <div class="mb-6">
             <label for="licenseKey" class="block text-gray-700 text-sm font-medium mb-2">Clave de Licencia:</label>
-            <input type="text" id="licenseKey" placeholder="Ingrese su clave aquí (ej. ABCD1234EFGH5678)"
+            <!-- CAMBIO: type="password" para ocultar la entrada -->
+            <input type="password" id="licenseKey" placeholder="Ingrese su clave aquí (ej. ABCD1234EFGH5678)"
                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 text-lg tracking-wider"
                    maxlength="16" oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '')">
             <p class="text-xs text-gray-500 mt-1">Solo caracteres alfanuméricos (letras mayúsculas y números).</p>
@@ -39,6 +40,13 @@
                 class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75">
             Activar Licencia
         </button>
+
+        <!-- NUEVO: Botón de Desactivar Licencia -->
+        <button id="deactivateButton"
+                class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg mt-4 transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-75">
+            Desactivar Licencia
+        </button>
+
 
         <div id="messageContainer" class="mt-6 p-4 rounded-lg text-center" style="display: none;">
             <!-- Los mensajes de estado se insertarán aquí -->
@@ -52,6 +60,7 @@
     <script>
         const licenseKeyInput = document.getElementById('licenseKey');
         const activateButton = document.getElementById('activateButton');
+        const deactivateButton = document.getElementById('deactivateButton'); // NUEVO: Referencia al botón de desactivar
         const messageContainer = document.getElementById('messageContainer');
         const checkLicenseLink = document.getElementById('checkLicenseLink');
 
@@ -89,6 +98,7 @@
 
             displayMessage('Activando licencia... por favor espere.', 'loading');
             activateButton.disabled = true;
+            deactivateButton.disabled = true; // Deshabilitar también el de desactivar durante la activación
 
             try {
                 const response = await fetch('http://localhost:8000/api/license/activate', {
@@ -103,6 +113,8 @@
 
                 if (response.ok) {
                     displayMessage(data.message, 'success');
+                    // Opcional: limpiar el campo de la licencia después de la activación exitosa
+                    // licenseKeyInput.value = '';
                 } else {
                     displayMessage(data.detail || data.message || 'Error desconocido al activar la licencia.', 'error');
                 }
@@ -111,8 +123,51 @@
                 displayMessage('Error de conexión con el servidor. Asegúrese de que el servidor esté funcionando.', 'error');
             } finally {
                 activateButton.disabled = false;
+                deactivateButton.disabled = false; // Habilitar de nuevo al finalizar
             }
         }
+
+        // NUEVO: Función para manejar la desactivación de la licencia
+        async function deactivateLicense() {
+            // Reemplazo de confirm() con una simple pregunta en la consola
+            const confirmDeactivation = window.confirm("¿Está seguro de que desea desactivar la licencia? Esto requerirá una nueva activación para usar la aplicación.");
+            if (!confirmDeactivation) {
+                displayMessage('Desactivación cancelada.', 'info');
+                return;
+            }
+
+            clearMessage();
+            displayMessage('Desactivando licencia... por favor espere.', 'loading');
+            activateButton.disabled = true;
+            deactivateButton.disabled = true;
+
+            try {
+                // Asumimos un endpoint DELETE para la desactivación
+                const response = await fetch('http://localhost:8000/api/license/deactivate', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayMessage(data.message, 'success');
+                    // Después de desactivar, verificar el estado para actualizar la UI
+                    checkLicenseStatus(); 
+                } else {
+                    displayMessage(data.detail || data.message || 'Error desconocido al desactivar la licencia.', 'error');
+                }
+            } catch (error) {
+                console.error('Error de red al desactivar la licencia:', error);
+                displayMessage('Error de conexión con el servidor al intentar desactivar la licencia.', 'error');
+            } finally {
+                activateButton.disabled = false;
+                deactivateButton.disabled = false;
+            }
+        }
+
 
         // Función para verificar el estado de la licencia
         async function checkLicenseStatus() {
@@ -126,20 +181,33 @@
                 if (response.ok) {
                     if (data.is_active) {
                         displayMessage(data.message + ' ¡La aplicación está lista para usar!', 'success');
+                        deactivateButton.style.display = 'block'; // Mostrar botón de desactivar si está activa
+                        activateButton.style.display = 'none'; // Ocultar activar si está activa
+                        licenseKeyInput.style.display = 'none'; // Ocultar input si está activa
                     } else {
                         displayMessage(data.message + ' Por favor, active su licencia.', 'info');
+                        deactivateButton.style.display = 'none'; // Ocultar desactivar si no está activa
+                        activateButton.style.display = 'block'; // Mostrar activar si no está activa
+                        licenseKeyInput.style.display = 'block'; // Mostrar input si no está activa
                     }
                 } else {
                     displayMessage(data.detail || data.message || 'Error desconocido al verificar la licencia.', 'error');
+                    deactivateButton.style.display = 'none'; // Asegurarse de que esté oculto si hay error
+                    activateButton.style.display = 'block'; // Mostrar activar
+                    licenseKeyInput.style.display = 'block'; // Mostrar input
                 }
             } catch (error) {
                 console.error('Error de red al verificar la licencia:', error);
                 displayMessage('Error de conexión con el servidor al verificar el estado.', 'error');
+                deactivateButton.style.display = 'none'; // Asegurarse de que esté oculto si hay error
+                activateButton.style.display = 'block'; // Mostrar activar
+                licenseKeyInput.style.display = 'block'; // Mostrar input
             }
         }
 
         // Event Listeners
         activateButton.addEventListener('click', activateLicense);
+        deactivateButton.addEventListener('click', deactivateLicense); // NUEVO: Event listener para el botón de desactivar
         licenseKeyInput.addEventListener('keyup', (event) => {
             if (event.key === 'Enter') {
                 activateLicense();
