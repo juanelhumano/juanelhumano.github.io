@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activación de Licencia SicarDBApp</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilo personalizado para la fuente Inter */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Un gris azulado claro */
+        }
+        /* Ocultar scrollbar si no es necesario */
+        body {
+            overflow: auto; /* Permite scroll solo si el contenido lo excede */
+        }
+        /* Alineación vertical del botón */
+        .flex-center-y {
+            align-items: center;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Activación de Licencia</h1>
+        <p class="text-gray-600 mb-6 text-center">Por favor, ingrese su clave de licencia alfanumérica de 16 dígitos para activar la aplicación.</p>
+
+        <div class="mb-6">
+            <label for="licenseKey" class="block text-gray-700 text-sm font-medium mb-2">Clave de Licencia:</label>
+            <input type="text" id="licenseKey" placeholder="Ingrese su clave aquí (ej. ABCD1234EFGH5678)"
+                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 text-lg tracking-wider"
+                   maxlength="16" oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '')">
+            <p class="text-xs text-gray-500 mt-1">Solo caracteres alfanuméricos (letras mayúsculas y números).</p>
+        </div>
+
+        <button id="activateButton"
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75">
+            Activar Licencia
+        </button>
+
+        <div id="messageContainer" class="mt-6 p-4 rounded-lg text-center" style="display: none;">
+            <!-- Los mensajes de estado se insertarán aquí -->
+        </div>
+
+        <div class="text-center mt-8">
+            <p class="text-gray-500 text-sm">¿Ya activó su licencia? <a href="#" id="checkLicenseLink" class="text-blue-600 hover:underline">Verificar estado.</a></p>
+        </div>
+    </div>
+
+    <script>
+        const licenseKeyInput = document.getElementById('licenseKey');
+        const activateButton = document.getElementById('activateButton');
+        const messageContainer = document.getElementById('messageContainer');
+        const checkLicenseLink = document.getElementById('checkLicenseLink');
+
+        // Función para mostrar mensajes
+        function displayMessage(message, type = 'info') {
+            messageContainer.style.display = 'block';
+            messageContainer.textContent = message;
+            messageContainer.className = 'mt-6 p-4 rounded-lg text-center'; // Reset class
+            if (type === 'success') {
+                messageContainer.classList.add('bg-green-100', 'text-green-800');
+            } else if (type === 'error') {
+                messageContainer.classList.add('bg-red-100', 'text-red-800');
+            } else if (type === 'loading') {
+                messageContainer.classList.add('bg-blue-100', 'text-blue-800');
+            } else {
+                messageContainer.classList.add('bg-gray-100', 'text-gray-700');
+            }
+        }
+
+        // Función para limpiar mensajes
+        function clearMessage() {
+            messageContainer.style.display = 'none';
+            messageContainer.textContent = '';
+        }
+
+        // Función para manejar la activación de la licencia
+        async function activateLicense() {
+            clearMessage();
+            const licenseKey = licenseKeyInput.value.trim();
+
+            if (licenseKey.length !== 16 || !/^[A-Z0-9]+$/.test(licenseKey)) {
+                displayMessage('Por favor, ingrese una clave de licencia válida de 16 dígitos alfanuméricos.', 'error');
+                return;
+            }
+
+            displayMessage('Activando licencia... por favor espere.', 'loading');
+            activateButton.disabled = true;
+
+            try {
+                const response = await fetch('http://localhost:8000/api/license/activate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ license_key: licenseKey }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayMessage(data.message, 'success');
+                } else {
+                    displayMessage(data.detail || data.message || 'Error desconocido al activar la licencia.', 'error');
+                }
+            } catch (error) {
+                console.error('Error de red al activar la licencia:', error);
+                displayMessage('Error de conexión con el servidor. Asegúrese de que el servidor esté funcionando.', 'error');
+            } finally {
+                activateButton.disabled = false;
+            }
+        }
+
+        // Función para verificar el estado de la licencia
+        async function checkLicenseStatus() {
+            clearMessage();
+            displayMessage('Verificando estado de la licencia...', 'loading');
+
+            try {
+                const response = await fetch('http://localhost:8000/api/license/check');
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (data.is_active) {
+                        displayMessage(data.message + ' ¡La aplicación está lista para usar!', 'success');
+                    } else {
+                        displayMessage(data.message + ' Por favor, active su licencia.', 'info');
+                    }
+                } else {
+                    displayMessage(data.detail || data.message || 'Error desconocido al verificar la licencia.', 'error');
+                }
+            } catch (error) {
+                console.error('Error de red al verificar la licencia:', error);
+                displayMessage('Error de conexión con el servidor al verificar el estado.', 'error');
+            }
+        }
+
+        // Event Listeners
+        activateButton.addEventListener('click', activateLicense);
+        licenseKeyInput.addEventListener('keyup', (event) => {
+            if (event.key === 'Enter') {
+                activateLicense();
+            }
+        });
+        checkLicenseLink.addEventListener('click', (event) => {
+            event.preventDefault(); // Evitar que el enlace navegue
+            checkLicenseStatus();
+        });
+
+        // Verificar el estado de la licencia al cargar la página
+        window.onload = checkLicenseStatus;
+
+    </script>
+</body>
+</html>
