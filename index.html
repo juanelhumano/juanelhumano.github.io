@@ -3,246 +3,398 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Activación de Licencia SicarDBApp</title>
-    <!-- Tailwind CSS CDN -->
+    <title>SICAR Runner</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Estilo personalizado para la fuente Inter */
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f0f4f8; /* Un gris azulado claro */
+            font-family: 'Press Start 2P', cursive;
+            overflow: hidden;
         }
-        /* Ocultar scrollbar si no es necesario */
-        body {
-            overflow: auto; /* Permite scroll solo si el contenido lo excede */
+        .game-container {
+            touch-action: none;
         }
-        /* Alineación vertical del botón */
-        .flex-center-y {
-            align-items: center;
+        canvas {
+            background-color: #f7f7f7;
+            border-bottom: 2px solid #333;
         }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4">
-    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-        <!-- Logo de SICAR AI -->
-        <div class="flex justify-center mb-6">
-            <img src="https://i.ibb.co/Z6zBk9Fz/image-6c165e.png" alt="SICAR AI Logo" class="h-24 w-24 object-contain rounded-xl"
-                 onerror="this.onerror=null;this.src='https://placehold.co/96x96/aabbcc/ffffff?text=Logo';">
-        </div>
-        <!-- Título actualizado -->
-        <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Activa tu licencia de SICAR AI</h1>
-        <p class="text-gray-600 mb-6 text-center">Por favor, ingrese su clave de licencia alfanumérica de 16 dígitos para activar la aplicación.</p>
+<body class="bg-gray-800 text-white flex items-center justify-center h-screen m-0">
 
-        <div class="mb-6">
-            <label for="licenseKey" class="block text-gray-700 text-sm font-medium mb-2">Clave de Licencia:</label>
-            <input type="password" id="licenseKey" placeholder="Ingrese su clave aquí (ej. ABCD1234EFGH5678)"
-                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 text-lg tracking-wider"
-                   maxlength="16" oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '')">
-            <p class="text-xs text-gray-500 mt-1">Solo caracteres alfanuméricos (letras mayúsculas y números).</p>
+    <div id="game-container" class="game-container w-full max-w-4xl text-center p-4">
+        <h1 class="text-4xl md:text-5xl mb-2">SICAR Runner</h1>
+        
+        <div class="flex justify-between items-center text-lg md:text-2xl mb-4 px-2">
+            <div>SCORE: <span id="score">0</span></div>
+            <div>HI: <span id="high-score">0</span></div>
         </div>
 
-        <button id="activateButton"
-                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75">
-            Activar Licencia
-        </button>
-
-        <button id="deactivateButton"
-                class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg mt-4 transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-75">
-            Desactivar Licencia
-        </button>
-
-        <div id="messageContainer" class="mt-6 p-4 rounded-lg text-center" style="display: none;">
-            <!-- Los mensajes de estado se insertarán aquí -->
-        </div>
-
-        <!-- Contenedor para mostrar la fecha de activación -->
-        <div id="activationDateDisplay" class="mt-4 text-center text-gray-600 text-sm" style="display: none;">
-            <!-- La fecha de activación se insertará aquí -->
-        </div>
-
-        <div class="text-center mt-8">
-            <p class="text-gray-500 text-sm">¿Ya activó su licencia? <a href="#" id="checkLicenseLink" class="text-blue-600 hover:underline">Verificar estado.</a></p>
+        <div class="relative w-full aspect-[2/1] bg-white rounded-lg shadow-2xl overflow-hidden">
+            <canvas id="gameCanvas"></canvas>
+            <div id="start-screen" class="absolute inset-0 bg-black bg-opacity-60 flex flex-col items-center justify-center p-4">
+                <p class="text-2xl md:text-4xl mb-4">¡Prepárate para correr!</p>
+                <p class="text-lg md:text-xl mb-8">Presiona ESPACIO o toca la pantalla para saltar</p>
+                <button id="start-button" class="bg-green-500 text-white font-bold py-3 px-8 rounded-lg text-2xl hover:bg-green-600 transition-colors duration-300">
+                    Iniciar Juego
+                </button>
+            </div>
+            <div id="game-over-screen" class="absolute inset-0 bg-black bg-opacity-60 flex-col items-center justify-center p-4 hidden">
+                <p class="text-4xl md:text-6xl mb-4">GAME OVER</p>
+                <button id="restart-button" class="bg-blue-500 text-white font-bold py-3 px-8 rounded-lg text-2xl hover:bg-blue-600 transition-colors duration-300">
+                    Reiniciar
+                </button>
+            </div>
         </div>
     </div>
 
     <script>
-        const licenseKeyInput = document.getElementById('licenseKey');
-        const activateButton = document.getElementById('activateButton');
-        const deactivateButton = document.getElementById('deactivateButton');
-        const messageContainer = document.getElementById('messageContainer');
-        const checkLicenseLink = document.getElementById('checkLicenseLink');
-        const activationDateDisplay = document.getElementById('activationDateDisplay'); // Referencia al elemento de fecha
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const highScoreEl = document.getElementById('high-score');
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const startButton = document.getElementById('start-button');
+        const restartButton = document.getElementById('restart-button');
 
-        // Función para mostrar mensajes
-        function displayMessage(message, type = 'info') {
-            messageContainer.style.display = 'block';
-            messageContainer.textContent = message;
-            messageContainer.className = 'mt-6 p-4 rounded-lg text-center'; // Reset class
-            if (type === 'success') {
-                messageContainer.classList.add('bg-green-100', 'text-green-800');
-            } else if (type === 'error') {
-                messageContainer.classList.add('bg-red-100', 'text-red-800');
-            } else if (type === 'loading') {
-                messageContainer.classList.add('bg-blue-100', 'text-blue-800');
-            } else {
-                messageContainer.classList.add('bg-gray-100', 'text-gray-700');
-            }
-        }
+        // --- Image Assets ---
+        // I'm using placeholder images here. You should replace the 'src' values
+        // with the actual paths to your images if you host them somewhere,
+        // or just use the filenames if they are in the same folder as the HTML file.
+        const imageUrls = {
+            playerRun1: 'correr.png',
+            playerRun2: 'correr2.png',
+            playerJump: 'jump.png',
+            obstacles: [
+                'Bascula-SICAR-Mary3W_02.jpg',
+                'Etiquetadora-Dora88s-B-trans.png',
+                'Etiquetadora-EVA-Black-58-2.png',
+                'Etiquetadora-QL800-2.jpg',
+                'Imp-SICAR-WL88S-F.png',
+                'SICAR-AndyD2-1.png',
+                'Sicar-Hammbox-4-1.png'
+            ]
+        };
 
-        // Función para limpiar mensajes
-        function clearMessage() {
-            messageContainer.style.display = 'none';
-            messageContainer.textContent = '';
-        }
+        const images = {};
+        let imagesLoaded = 0;
+        const totalImages = 2 + imageUrls.obstacles.length + 1; // run1, run2, jump + obstacles
 
-        // Función para manejar la activación de la licencia
-        async function activateLicense() {
-            clearMessage();
-            const licenseKey = licenseKeyInput.value.trim();
-
-            if (licenseKey.length !== 16 || !/^[A-Z0-9]+$/.test(licenseKey)) {
-                displayMessage('Por favor, ingrese una clave de licencia válida de 16 dígitos alfanuméricos.', 'error');
-                return;
-            }
-
-            displayMessage('Activando licencia... por favor espere.', 'loading');
-            activateButton.disabled = true;
-            deactivateButton.disabled = true;
-
-            try {
-                const response = await fetch('http://localhost:8000/api/license/activate', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ license_key: licenseKey }),
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    displayMessage(data.message, 'success');
-                    // Llamar a checkLicenseStatus para actualizar la UI
-                    await checkLicenseStatus(); 
-                } else {
-                    displayMessage(data.detail || data.message || 'Error desconocido al activar la licencia.', 'error');
+        function loadImages(callback) {
+            function onImageLoad() {
+                imagesLoaded++;
+                if (imagesLoaded === totalImages) {
+                    callback();
                 }
-            } catch (error) {
-                console.error('Error de red al activar la licencia:', error);
-                displayMessage('Error de conexión con el servidor. Asegúrese de que el servidor esté funcionando.', 'error');
-            } finally {
-                activateButton.disabled = false;
-                deactivateButton.disabled = false;
             }
+            
+            images.playerRun1 = new Image();
+            images.playerRun1.src = imageUrls.playerRun1;
+            images.playerRun1.onload = onImageLoad;
+            images.playerRun1.onerror = () => { onImageLoad(); console.log(`Error loading ${imageUrls.playerRun1}`); };
+
+            images.playerRun2 = new Image();
+            images.playerRun2.src = imageUrls.playerRun2;
+            images.playerRun2.onload = onImageLoad;
+            images.playerRun2.onerror = () => { onImageLoad(); console.log(`Error loading ${imageUrls.playerRun2}`); };
+            
+            images.playerJump = new Image();
+            images.playerJump.src = imageUrls.playerJump;
+            images.playerJump.onload = onImageLoad;
+            images.playerJump.onerror = () => { onImageLoad(); console.log(`Error loading ${imageUrls.playerJump}`); };
+
+            images.obstacles = [];
+            imageUrls.obstacles.forEach(src => {
+                const img = new Image();
+                img.src = src;
+                img.onload = onImageLoad;
+                img.onerror = () => { onImageLoad(); console.log(`Error loading ${src}`); };
+                images.obstacles.push(img);
+            });
+        }
+        
+        // --- Game Variables ---
+        let player, gravity, obstacles, gameSpeed, score, highScore, gameOver, spawnTimer;
+        let groundHeight;
+        let animationFrameId;
+        let runFrame = 0;
+        let floatingScores = [];
+
+        // --- Game Setup ---
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            groundHeight = canvas.height - 70; // Adjust ground position
         }
 
-        // Función para manejar la desactivación de la licencia
-        async function deactivateLicense() {
-            const confirmDeactivation = window.confirm("¿Está seguro de que desea desactivar la licencia? Esto requerirá una nueva activación para usar la aplicación.");
-            if (!confirmDeactivation) {
-                displayMessage('Desactivación cancelada.', 'info');
-                return;
+        function init() {
+            resizeCanvas();
+            
+            gravity = 0.7;
+            obstacles = [];
+            floatingScores = [];
+            gameSpeed = 5;
+            score = 0;
+            highScore = localStorage.getItem('sicarRunnerHighScore') || 0;
+            highScoreEl.innerText = highScore;
+            gameOver = false;
+            spawnTimer = 100; // Initial delay before first obstacle
+        }
+
+        // --- Player ---
+        class Player {
+            constructor(x, y, width, height) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.dy = 0;
+                this.jumpPower = 15;
+                this.grounded = true;
             }
 
-            clearMessage();
-            displayMessage('Desactivando licencia... por favor espere.', 'loading');
-            activateButton.disabled = true;
-            deactivateButton.disabled = true;
-
-            try {
-                const response = await fetch('http://localhost:8000/api/license/deactivate', {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    displayMessage(data.message, 'success');
-                    // Después de desactivar, verificar el estado para actualizar la UI
-                    await checkLicenseStatus(); 
+            draw(ctx) {
+                let currentImage;
+                if (!this.grounded) {
+                    currentImage = images.playerJump;
                 } else {
-                    displayMessage(data.detail || data.message || 'Error desconocido al desactivar la licencia.', 'error');
+                    currentImage = runFrame < 10 ? images.playerRun1 : images.playerRun2;
                 }
-            } catch (error) {
-                console.error('Error de red al desactivar la licencia:', error);
-                displayMessage('Error de conexión con el servidor al intentar desactivar la licencia.', 'error');
-            } finally {
-                activateButton.disabled = false;
-                deactivateButton.disabled = false;
-            }
-        }
-
-
-        // Función para verificar el estado de la licencia
-        async function checkLicenseStatus() {
-            clearMessage();
-            activationDateDisplay.style.display = 'none'; // Ocultar fecha por defecto
-            activationDateDisplay.textContent = ''; // Limpiar texto de fecha
-            displayMessage('Verificando estado de la licencia...', 'loading');
-
-            try {
-                const response = await fetch('http://localhost:8000/api/license/check');
-                const data = await response.json();
-
-                if (response.ok) {
-                    if (data.is_active) {
-                        displayMessage(data.message + ' ¡La aplicación está lista para usar!', 'success');
-                        deactivateButton.style.display = 'block'; // Mostrar botón de desactivar si está activa
-                        activateButton.style.display = 'none'; // Ocultar activar si está activa
-                        licenseKeyInput.style.display = 'none'; // Ocultar input si está activa
-                        
-                        // Mostrar fecha de activación
-                        if (data.activation_date) {
-                            const date = new Date(data.activation_date);
-                            const formattedDate = date.toLocaleString('es-ES', { 
-                                year: 'numeric', month: 'long', day: 'numeric', 
-                                hour: '2-digit', minute: '2-digit', second: '2-digit' 
-                            });
-                            activationDateDisplay.textContent = `Activada el: ${formattedDate}`;
-                            activationDateDisplay.style.display = 'block';
-                        }
-                    } else {
-                        displayMessage(data.message + ' Por favor, active su licencia.', 'info');
-                        deactivateButton.style.display = 'none'; // Ocultar desactivar si no está activa
-                        activateButton.style.display = 'block'; // Mostrar activar si no está activa
-                        licenseKeyInput.style.display = 'block'; // Mostrar input si no está activa
-                    }
+                
+                if (currentImage && currentImage.complete && currentImage.naturalHeight !== 0) {
+                     ctx.drawImage(currentImage, this.x, this.y, this.width, this.height);
                 } else {
-                    // Si la respuesta no es OK (ej. 500, 403), también asegurarse de que la UI refleje "no activa"
-                    displayMessage(data.detail || data.message || 'Error desconocido al verificar la licencia.', 'error');
-                    deactivateButton.style.display = 'none'; 
-                    activateButton.style.display = 'block'; 
-                    licenseKeyInput.style.display = 'block'; 
+                    // Fallback drawing if image fails to load
+                    ctx.fillStyle = 'blue';
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
                 }
-            } catch (error) {
-                console.error('Error de red al verificar la licencia:', error);
-                // Si hay un error de red (servidor no accesible), también reflejar "no activa"
-                displayMessage('Error de conexión con el servidor al verificar el estado.', 'error');
-                deactivateButton.style.display = 'none'; 
-                activateButton.style.display = 'block'; 
-                licenseKeyInput.style.display = 'block'; 
+            }
+
+            update() {
+                runFrame = (runFrame + 1) % 20;
+
+                if (!this.grounded) {
+                    this.dy += gravity;
+                    this.y += this.dy;
+                }
+
+                if (this.y + this.height >= groundHeight) {
+                    this.y = groundHeight - this.height;
+                    this.dy = 0;
+                    this.grounded = true;
+                }
+            }
+
+            jump() {
+                if (this.grounded) {
+                    this.dy = -this.jumpPower;
+                    this.grounded = false;
+                }
+            }
+        }
+        
+        // --- Floating Score Effect ---
+        class FloatingScore {
+            constructor(x, y, value) {
+                this.x = x;
+                this.y = y;
+                this.value = value;
+                this.opacity = 1;
+                this.lifespan = 60; // apx. 1 second
+            }
+
+            update() {
+                this.y -= 0.8; // Float up
+                this.lifespan--;
+                this.opacity = this.lifespan / 60;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = this.opacity;
+                ctx.fillStyle = '#1f2937'; // Dark gray color
+                ctx.font = '20px "Press Start 2P"';
+                ctx.fillText(this.value, this.x, this.y);
+                ctx.restore();
             }
         }
 
-        // Event Listeners
-        activateButton.addEventListener('click', activateLicense);
-        deactivateButton.addEventListener('click', deactivateLicense);
-        licenseKeyInput.addEventListener('keyup', (event) => {
-            if (event.key === 'Enter') {
-                activateLicense();
+        // --- Obstacles ---
+        class Obstacle {
+            constructor(x, y, width, height, image) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.image = image;
+                this.passed = false; // To track if player cleared it
+            }
+
+            draw(ctx) {
+                 if (this.image && this.image.complete && this.image.naturalHeight !== 0) {
+                    ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+                } else {
+                    // Fallback drawing
+                    ctx.fillStyle = 'red';
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+            }
+
+            update() {
+                this.x -= gameSpeed;
+            }
+        }
+        
+        function spawnObstacle() {
+            spawnTimer--;
+            if (spawnTimer <= 0) {
+                const randomImage = images.obstacles[Math.floor(Math.random() * images.obstacles.length)];
+                
+                // Randomize obstacle size slightly
+                const scale = 0.8 + Math.random() * 0.4; // 80% to 120% of base size
+                const baseHeight = 50;
+                const height = baseHeight * scale;
+                const width = (randomImage.width / randomImage.height) * height;
+
+                const newObstacle = new Obstacle(
+                    canvas.width, 
+                    groundHeight - height, 
+                    width, 
+                    height, 
+                    randomImage
+                );
+                obstacles.push(newObstacle);
+
+                // Reset spawn timer with some randomness
+                spawnTimer = 100 - gameSpeed * 4 - Math.random() * 40;
+                if(spawnTimer < 40) spawnTimer = 40;
+            }
+        }
+
+        function checkCollision(player, obstacle) {
+            const padding = 5; // Make hitbox slightly smaller
+            return (
+                player.x + padding < obstacle.x + obstacle.width - padding &&
+                player.x + player.width - padding > obstacle.x + padding &&
+                player.y + padding < obstacle.y + obstacle.height - padding &&
+                player.y + player.height - padding > obstacle.y + padding
+            );
+        }
+
+        // --- Game Loop ---
+        function animate() {
+            if (gameOver) return;
+
+            animationFrameId = requestAnimationFrame(animate);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Update & Draw Player
+            player.update();
+            player.draw(ctx);
+            
+            // Spawn, Update & Draw Obstacles
+            spawnObstacle();
+            obstacles.forEach((obstacle, index) => {
+                obstacle.update();
+                obstacle.draw(ctx);
+
+                // Check for successful jump and award points
+                if (!obstacle.passed && obstacle.x + obstacle.width < player.x) {
+                    const points = 100;
+                    score += points;
+                    floatingScores.push(new FloatingScore(player.x, player.y, `+${points}`));
+                    obstacle.passed = true;
+                }
+
+                // Collision check
+                if (checkCollision(player, obstacle)) {
+                    endGame();
+                }
+
+                // Remove off-screen obstacles
+                if (obstacle.x + obstacle.width < 0) {
+                    obstacles.splice(index, 1);
+                }
+            });
+
+            // Update and draw floating scores
+            floatingScores.forEach((fs, index) => {
+                fs.update();
+                fs.draw(ctx);
+                if (fs.opacity <= 0) {
+                    floatingScores.splice(index, 1);
+                }
+            });
+
+            // Update Score (distance) & Speed
+            score++;
+            scoreEl.innerText = Math.floor(score);
+            if (score % 200 === 0) { // Increase speed a bit slower
+                gameSpeed += 0.1;
+            }
+        }
+        
+        // --- Game State ---
+        function startGame() {
+            cancelAnimationFrame(animationFrameId);
+            startScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            
+            init();
+            player = new Player(50, groundHeight - 60, 50, 60);
+            
+            animate();
+        }
+
+        function endGame() {
+            gameOver = true;
+            cancelAnimationFrame(animationFrameId);
+            gameOverScreen.classList.remove('hidden');
+
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('sicarRunnerHighScore', highScore);
+                highScoreEl.innerText = highScore;
+            }
+        }
+
+        // --- Event Listeners ---
+        window.addEventListener('resize', () => {
+             resizeCanvas();
+             init(); // Re-initialize to adjust ground etc.
+        });
+        
+        startButton.addEventListener('click', startGame);
+        restartButton.addEventListener('click', startGame);
+
+        document.addEventListener('keydown', e => {
+            if (e.code === 'Space' || e.key === ' ' || e.code === 'ArrowUp') {
+                e.preventDefault();
+                if(!gameOver) player.jump();
             }
         });
-        checkLicenseLink.addEventListener('click', (event) => {
-            event.preventDefault(); 
-            checkLicenseStatus();
+        
+        canvas.parentElement.addEventListener('mousedown', () => {
+             if(!gameOver) player.jump();
+        });
+        
+        canvas.parentElement.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if(!gameOver) player.jump();
         });
 
-        // Verificar el estado de la licencia al cargar la página
-        window.onload = checkLicenseStatus;
+        // --- Initial Load ---
+        loadImages(() => {
+            console.log("All images loaded, game is ready.");
+            init();
+            player = new Player(50, groundHeight - 60, 50, 60);
+            player.draw(ctx); // Draw initial player state
+        });
 
     </script>
 </body>
 </html>
+
+
