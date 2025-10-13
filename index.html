@@ -66,20 +66,27 @@
             playerRun1: 'correr.png',
             playerRun2: 'correr2.png',
             playerJump: 'jump.png',
-            obstacles: [
-                'Bascula-SICAR-Mary3W_02.jpg',
-                'Etiquetadora-Dora88s-B-trans.png',
-                'Etiquetadora-EVA-Black-58-2.png',
-                'Etiquetadora-QL800-2.jpg',
-                'Imp-SICAR-WL88S-F.png',
-                'SICAR-AndyD2-1.png',
-                'Sicar-Hammbox-4-1.png'
-            ]
         };
+
+        const obstacleData = [
+            { src: 'Bascula-SICAR-Mary3W_02.jpg', points: 13 },
+            { src: 'Etiquetadora-Dora88s-B-trans.png', points: 13 },
+            { src: 'Etiquetadora-EVA-Black-58-2.png', points: 13 },
+            { src: 'Etiquetadora-QL800-2.jpg', points: 13 },
+            { src: 'Imp-SICAR-WL88S-F.png', points: 13 },
+            { src: 'SICAR-AndyD2-1.png', points: 13 },
+            { src: 'Sicar-Hammbox-4-1.png', points: 13 },
+            { src: 'comandero.JPG', points: 22 },
+            { src: 'migra.PNG', points: 19 },
+            { src: 'repo.PNG', points: 19 },
+            { src: 'sellos.JPG', points: 5 },
+            { src: 'sicar-movil.JPG', points: 5 },
+            { src: 'correo.JPG', points: 5 },
+        ];
 
         const images = {};
         let imagesLoaded = 0;
-        const totalImages = 2 + imageUrls.obstacles.length + 1; // run1, run2, jump + obstacles
+        const totalImages = 3 + obstacleData.length; // run1, run2, jump + obstacles
 
         function loadImages(callback) {
             function onImageLoad() {
@@ -105,12 +112,12 @@
             images.playerJump.onerror = () => { onImageLoad(); console.log(`Error loading ${imageUrls.playerJump}`); };
 
             images.obstacles = [];
-            imageUrls.obstacles.forEach(src => {
+            obstacleData.forEach(data => {
                 const img = new Image();
-                img.src = src;
+                img.src = data.src;
                 img.onload = onImageLoad;
-                img.onerror = () => { onImageLoad(); console.log(`Error loading ${src}`); };
-                images.obstacles.push(img);
+                img.onerror = () => { onImageLoad(); console.log(`Error loading ${data.src}`); };
+                images.obstacles.push({ image: img, points: data.points });
             });
         }
         
@@ -223,12 +230,13 @@
 
         // --- Obstacles ---
         class Obstacle {
-            constructor(x, y, width, height, image) {
+            constructor(x, y, width, height, image, points) {
                 this.x = x;
                 this.y = y;
                 this.width = width;
                 this.height = height;
                 this.image = image;
+                this.points = points;
                 this.passed = false; // To track if player cleared it
             }
 
@@ -250,20 +258,24 @@
         function spawnObstacle() {
             spawnTimer--;
             if (spawnTimer <= 0) {
-                const randomImage = images.obstacles[Math.floor(Math.random() * images.obstacles.length)];
+                const randomObstacleData = images.obstacles[Math.floor(Math.random() * images.obstacles.length)];
+                const randomImage = randomObstacleData.image;
+                const points = randomObstacleData.points;
                 
                 // Randomize obstacle size slightly
                 const scale = 0.8 + Math.random() * 0.4; // 80% to 120% of base size
                 const baseHeight = 50;
                 const height = baseHeight * scale;
-                const width = (randomImage.width / randomImage.height) * height;
+                // Ensure width is calculated only if image has loaded, otherwise default
+                const width = (randomImage.naturalWidth > 0) ? (randomImage.width / randomImage.height) * height : 50;
 
                 const newObstacle = new Obstacle(
                     canvas.width, 
                     groundHeight - height, 
                     width, 
                     height, 
-                    randomImage
+                    randomImage,
+                    points
                 );
                 obstacles.push(newObstacle);
 
@@ -302,7 +314,7 @@
 
                 // Check for successful jump and award points
                 if (!obstacle.passed && obstacle.x + obstacle.width < player.x) {
-                    const points = 100;
+                    const points = obstacle.points;
                     score += points;
                     floatingScores.push(new FloatingScore(player.x, player.y, `+${points}`));
                     obstacle.passed = true;
@@ -396,5 +408,6 @@
     </script>
 </body>
 </html>
+
 
 
