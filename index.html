@@ -18,6 +18,9 @@
             background-color: #f7f7f7;
             border-bottom: 2px solid #333;
         }
+        #commission-status {
+            transition: color 0.3s ease-in-out;
+        }
     </style>
 </head>
 <body class="bg-gray-800 text-white flex items-center justify-center h-screen m-0">
@@ -26,7 +29,10 @@
         <h1 class="text-4xl md:text-5xl mb-2">SICAR Runner</h1>
         
         <div class="flex justify-between items-center text-lg md:text-2xl mb-4 px-2">
-            <div>SCORE: <span id="score">0</span></div>
+            <div>
+                <div>COMISIONES: <span id="score">0</span></div>
+                <div id="commission-status" class="text-base mt-1">No comisiona</div>
+            </div>
             <div>HI: <span id="high-score">0</span></div>
         </div>
 
@@ -53,15 +59,13 @@
         const ctx = canvas.getContext('2d');
         const scoreEl = document.getElementById('score');
         const highScoreEl = document.getElementById('high-score');
+        const commissionStatusEl = document.getElementById('commission-status'); // Nuevo elemento
         const startScreen = document.getElementById('start-screen');
         const gameOverScreen = document.getElementById('game-over-screen');
         const startButton = document.getElementById('start-button');
         const restartButton = document.getElementById('restart-button');
 
         // --- Image Assets ---
-        // I'm using placeholder images here. You should replace the 'src' values
-        // with the actual paths to your images if you host them somewhere,
-        // or just use the filenames if they are in the same folder as the HTML file.
         const imageUrls = {
             playerRun1: 'correr.png',
             playerRun2: 'correr2.png',
@@ -82,12 +86,12 @@
             { src: 'sellos.JPG', points: 5 },
             { src: 'sicar-movil.JPG', points: 5 },
             { src: 'correo.JPG', points: 5 },
-            { src: 'nube.PNG', points: 15 },
+	        { src: 'nube.PNG', points: 15 }
         ];
 
         const images = {};
         let imagesLoaded = 0;
-        const totalImages = 3 + obstacleData.length; // run1, run2, jump + obstacles
+        const totalImages = 3 + obstacleData.length;
 
         function loadImages(callback) {
             function onImageLoad() {
@@ -134,7 +138,7 @@
             const container = canvas.parentElement;
             canvas.width = container.clientWidth;
             canvas.height = container.clientHeight;
-            groundHeight = canvas.height - 70; // Adjust ground position
+            groundHeight = canvas.height - 70;
         }
 
         function init() {
@@ -146,9 +150,14 @@
             gameSpeed = 5;
             score = 0;
             highScore = localStorage.getItem('sicarRunnerHighScore') || 0;
+            
+            scoreEl.innerText = 0;
             highScoreEl.innerText = highScore;
+            commissionStatusEl.innerText = 'No comisiona';
+            commissionStatusEl.style.color = '#facc15'; // Tailwind yellow-400
+
             gameOver = false;
-            spawnTimer = 100; // Initial delay before first obstacle
+            spawnTimer = 100;
         }
 
         // --- Player ---
@@ -174,7 +183,6 @@
                 if (currentImage && currentImage.complete && currentImage.naturalHeight !== 0) {
                      ctx.drawImage(currentImage, this.x, this.y, this.width, this.height);
                 } else {
-                    // Fallback drawing if image fails to load
                     ctx.fillStyle = 'blue';
                     ctx.fillRect(this.x, this.y, this.width, this.height);
                 }
@@ -210,11 +218,11 @@
                 this.y = y;
                 this.value = value;
                 this.opacity = 1;
-                this.lifespan = 60; // apx. 1 second
+                this.lifespan = 60;
             }
 
             update() {
-                this.y -= 0.8; // Float up
+                this.y -= 0.8;
                 this.lifespan--;
                 this.opacity = this.lifespan / 60;
             }
@@ -222,7 +230,7 @@
             draw(ctx) {
                 ctx.save();
                 ctx.globalAlpha = this.opacity;
-                ctx.fillStyle = '#1f2937'; // Dark gray color
+                ctx.fillStyle = '#1f2937';
                 ctx.font = '20px "Press Start 2P"';
                 ctx.fillText(this.value, this.x, this.y);
                 ctx.restore();
@@ -238,14 +246,13 @@
                 this.height = height;
                 this.image = image;
                 this.points = points;
-                this.passed = false; // To track if player cleared it
+                this.passed = false;
             }
 
             draw(ctx) {
                  if (this.image && this.image.complete && this.image.naturalHeight !== 0) {
                     ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
                 } else {
-                    // Fallback drawing
                     ctx.fillStyle = 'red';
                     ctx.fillRect(this.x, this.y, this.width, this.height);
                 }
@@ -263,11 +270,9 @@
                 const randomImage = randomObstacleData.image;
                 const points = randomObstacleData.points;
                 
-                // Randomize obstacle size slightly
-                const scale = 0.8 + Math.random() * 0.4; // 80% to 120% of base size
+                const scale = 0.8 + Math.random() * 0.4;
                 const baseHeight = 50;
                 const height = baseHeight * scale;
-                // Ensure width is calculated only if image has loaded, otherwise default
                 const width = (randomImage.naturalWidth > 0) ? (randomImage.width / randomImage.height) * height : 50;
 
                 const newObstacle = new Obstacle(
@@ -280,14 +285,13 @@
                 );
                 obstacles.push(newObstacle);
 
-                // Reset spawn timer with some randomness
                 spawnTimer = 100 - gameSpeed * 4 - Math.random() * 40;
                 if(spawnTimer < 40) spawnTimer = 40;
             }
         }
 
         function checkCollision(player, obstacle) {
-            const padding = 5; // Make hitbox slightly smaller
+            const padding = 5;
             return (
                 player.x + padding < obstacle.x + obstacle.width - padding &&
                 player.x + player.width - padding > obstacle.x + padding &&
@@ -303,17 +307,14 @@
             animationFrameId = requestAnimationFrame(animate);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Update & Draw Player
             player.update();
             player.draw(ctx);
             
-            // Spawn, Update & Draw Obstacles
             spawnObstacle();
             obstacles.forEach((obstacle, index) => {
                 obstacle.update();
                 obstacle.draw(ctx);
 
-                // Check for successful jump and award points
                 if (!obstacle.passed && obstacle.x + obstacle.width < player.x) {
                     const points = obstacle.points;
                     score += points;
@@ -321,18 +322,15 @@
                     obstacle.passed = true;
                 }
 
-                // Collision check
                 if (checkCollision(player, obstacle)) {
                     endGame();
                 }
 
-                // Remove off-screen obstacles
                 if (obstacle.x + obstacle.width < 0) {
                     obstacles.splice(index, 1);
                 }
             });
 
-            // Update and draw floating scores
             floatingScores.forEach((fs, index) => {
                 fs.update();
                 fs.draw(ctx);
@@ -341,10 +339,21 @@
                 }
             });
 
-            // Update Score (distance) & Speed
-            score++;
+            // --- LÓGICA DE PUNTUACIÓN MODIFICADA ---
+            // Siempre muestra el puntaje numérico
             scoreEl.innerText = Math.floor(score);
-            if (score % 200 === 0) { // Increase speed a bit slower
+
+            // Actualiza la leyenda y su color según el puntaje
+            if (score < 3000) {
+                commissionStatusEl.innerText = 'No comisiona';
+                commissionStatusEl.style.color = '#facc15'; // Amarillo
+            } else {
+                commissionStatusEl.innerText = '¡Comisiona!';
+                commissionStatusEl.style.color = '#4ade80'; // Verde
+            }
+            // --- FIN DE LA MODIFICACIÓN ---
+
+            if (score > 0 && Math.floor(score) % 200 === 0) {
                 gameSpeed += 0.1;
             }
         }
@@ -367,7 +376,7 @@
             gameOverScreen.classList.remove('hidden');
 
             if (score > highScore) {
-                highScore = score;
+                highScore = Math.floor(score);
                 localStorage.setItem('sicarRunnerHighScore', highScore);
                 highScoreEl.innerText = highScore;
             }
@@ -376,7 +385,9 @@
         // --- Event Listeners ---
         window.addEventListener('resize', () => {
              resizeCanvas();
-             init(); // Re-initialize to adjust ground etc.
+             if (!animationFrameId) {
+                init();
+             }
         });
         
         startButton.addEventListener('click', startGame);
@@ -385,17 +396,17 @@
         document.addEventListener('keydown', e => {
             if (e.code === 'Space' || e.key === ' ' || e.code === 'ArrowUp') {
                 e.preventDefault();
-                if(!gameOver) player.jump();
+                if(!gameOver && player) player.jump();
             }
         });
         
         canvas.parentElement.addEventListener('mousedown', () => {
-             if(!gameOver) player.jump();
+             if(!gameOver && player) player.jump();
         });
         
         canvas.parentElement.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            if(!gameOver) player.jump();
+            if(!gameOver && player) player.jump();
         });
 
         // --- Initial Load ---
@@ -403,13 +414,9 @@
             console.log("All images loaded, game is ready.");
             init();
             player = new Player(50, groundHeight - 60, 50, 60);
-            player.draw(ctx); // Draw initial player state
+            player.draw(ctx);
         });
 
     </script>
 </body>
 </html>
-
-
-
-
