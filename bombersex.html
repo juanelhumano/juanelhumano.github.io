@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Bomberman Online: Battle Rooms</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
@@ -10,14 +10,19 @@
         body { 
             background: #0f172a;
             color: white; font-family: 'Orbitron', sans-serif;
-            overflow: hidden; height: 100vh;
+            overflow: hidden; height: 100vh; width: 100vw;
             display: flex; align-items: center; justify-content: center;
+            touch-action: none; 
         }
         
         #mainContainer {
             display: flex;
-            align-items: flex-start;
+            align-items: center; /* Alineación vertical centrada de los hijos */
+            justify-content: center;
             gap: 20px;
+            /* Importante: permite que el contenedor se encoja si es necesario */
+            max-height: 100vh; 
+            max-width: 100vw;
         }
 
         #gameWrapper {
@@ -25,7 +30,9 @@
             box-shadow: 0 0 60px rgba(0, 0, 0, 0.9);
             border-radius: 12px; overflow: hidden;
             background: #111; border: 4px solid #334155;
-            transition: all 0.5s ease;
+            transition: transform 0.3s ease; /* Suavizar redimensionado */
+            /* Flex-shrink evita que el navegador calcule mal el tamaño antes del scale */
+            flex-shrink: 0; 
         }
 
         #sideHud {
@@ -38,16 +45,58 @@
             flex-direction: column;
             gap: 15px;
             box-shadow: 0 0 25px rgba(0,0,0,0.6);
+            /* Asegurar que el HUD no se rompa al redimensionar */
+            flex-shrink: 0; 
+            max-height: 90vh;
+            overflow-y: auto;
         }
-        
+
+        /* CONTROLES MÓVILES */
+        #mobileControls {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            height: 180px;
+            z-index: 100;
+            pointer-events: none; 
+        }
+
+        @media (max-width: 1024px) {
+            #mobileControls { display: flex; justify-content: space-between; padding: 0 40px; }
+            #sideHud { display: none !important; } 
+            #mainContainer { gap: 0; }
+            #mobileHud { display: flex !important; }
+        }
+
+        .dpad { position: relative; width: 160px; height: 160px; pointer-events: auto; }
+        .d-btn {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 10px;
+            width: 50px; height: 50px;
+            backdrop-filter: blur(4px);
+        }
+        .d-btn:active { background: rgba(250, 204, 21, 0.5); border-color: #facc15; }
+        .d-up { top: 0; left: 55px; } .d-down { bottom: 0; left: 55px; }
+        .d-left { top: 55px; left: 0; } .d-right { top: 55px; right: 0; }
+
+        .action-btn {
+            pointer-events: auto; width: 90px; height: 90px;
+            border-radius: 50%; background: rgba(239, 68, 68, 0.3);
+            border: 4px solid rgba(239, 68, 68, 0.6);
+            backdrop-filter: blur(4px);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2rem; margin-top: 30px;
+        }
+        .action-btn:active { background: rgba(239, 68, 68, 0.8); transform: scale(0.95); }
+
         .stat-box {
-            background: rgba(255,255,255,0.05);
-            padding: 12px;
-            border-radius: 8px;
-            border-left: 4px solid #facc15;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            background: rgba(255,255,255,0.05); padding: 12px;
+            border-radius: 8px; border-left: 4px solid #facc15;
+            display: flex; justify-content: space-between; align-items: center;
         }
         .stat-label { font-size: 0.75rem; color: #94a3b8; font-weight: bold; }
         .stat-val { font-size: 1.5rem; font-weight: 900; }
@@ -84,20 +133,20 @@
             border-radius: 4px; margin-bottom: 5px; border: 1px solid rgba(255,255,255,0.1);
         }
 
-        #joinSection {
-            transition: all 0.3s ease;
-            max-height: 0; overflow: hidden; opacity: 0;
-        }
-        #joinSection.active {
-            max-height: 150px; opacity: 1; margin-top: 10px;
-        }
+        #joinSection { transition: all 0.3s ease; max-height: 0; overflow: hidden; opacity: 0; }
+        #joinSection.active { max-height: 150px; opacity: 1; margin-top: 10px; }
         
         .room-code-display {
             position: absolute; top: 10px; right: 10px;
             background: rgba(0,0,0,0.8); color: #facc15;
             padding: 5px 15px; border-radius: 20px; border: 1px solid #facc15;
-            font-size: 1.2rem; font-weight: bold;
-            z-index: 10;
+            font-size: 1.2rem; font-weight: bold; z-index: 10;
+        }
+        
+        #mobileHud {
+            display: none; position: absolute; top: 10px; left: 10px;
+            background: rgba(0,0,0,0.6); padding: 5px 15px;
+            border-radius: 20px; gap: 15px; pointer-events: none; z-index: 5;
         }
     </style>
 </head>
@@ -106,47 +155,50 @@
     <div id="mainContainer">
         <div id="gameWrapper">
             <div id="roomCodeTag" class="room-code-display hidden">SALA: <span id="currentRoomCode">----</span></div>
+            
+            <div id="mobileHud">
+                <span class="text-red-400 font-bold">🔥 <span id="mRange">1</span></span>
+                <span class="text-blue-400 font-bold">💣 <span id="mBombs">1</span></span>
+                <span class="text-yellow-400 font-bold">⚡ <span id="mSpeed">N</span></span>
+                <span id="mGhost" class="hidden text-purple-400 font-bold animate-pulse">👻 <span id="ghostTimer">15</span>s</span>
+            </div>
+
             <canvas id="gameCanvas" width="960" height="960"></canvas>
 
-            <!-- MENÚ PRINCIPAL -->
+            <div id="mobileControls">
+                <div class="dpad">
+                    <div class="d-btn d-up" data-key="w"></div>
+                    <div class="d-btn d-down" data-key="s"></div>
+                    <div class="d-btn d-left" data-key="a"></div>
+                    <div class="d-btn d-right" data-key="d"></div>
+                </div>
+                <div class="action-btn" data-key="bomb">💣</div>
+            </div>
+
             <div id="mainMenu" class="ui-overlay">
                 <div class="w-80 p-8 bg-slate-900 border-2 border-slate-700 rounded-2xl shadow-2xl text-center relative">
                     <h1 class="text-4xl font-black text-white mb-6 italic tracking-tighter">BOMBER<br><span class="text-yellow-500">ARENA</span></h1>
-                    
                     <label class="text-[10px] text-gray-400 font-bold uppercase">Tu Apodo</label>
                     <input type="text" id="nicknameInput" placeholder="NICKNAME" class="cyber-input" maxlength="10">
-                    
                     <div class="mt-4 flex flex-col gap-2">
-                        <button onclick="connectAndCreate()" class="btn-cyber bg-green-500" style="background: linear-gradient(to bottom, #4ade80 0%, #16a34a 100%); border-color: #14532d;">
-                            CREAR SALA NUEVA
-                        </button>
-                        <button onclick="toggleJoin()" class="btn-cyber bg-blue-500" style="background: linear-gradient(to bottom, #60a5fa 0%, #2563eb 100%); border-color: #1e3a8a;">
-                            UNIRSE CON CÓDIGO
-                        </button>
+                        <button onclick="connectAndCreate()" class="btn-cyber bg-green-500" style="background: linear-gradient(to bottom, #4ade80 0%, #16a34a 100%); border-color: #14532d;">CREAR SALA NUEVA</button>
+                        <button onclick="toggleJoin()" class="btn-cyber bg-blue-500" style="background: linear-gradient(to bottom, #60a5fa 0%, #2563eb 100%); border-color: #1e3a8a;">UNIRSE CON CÓDIGO</button>
                     </div>
-
                     <div id="joinSection">
                         <label class="text-[10px] text-gray-400 font-bold uppercase mt-2">Código de Sala (4 dígitos)</label>
                         <input type="number" id="roomCodeInput" placeholder="0000" class="cyber-input text-2xl tracking-widest" style="letter-spacing: 5px;">
-                        <button onclick="connectAndJoin()" class="btn-cyber bg-purple-500 text-sm py-2" style="background: linear-gradient(to bottom, #c084fc 0%, #9333ea 100%); border-color: #6b21a8; margin-top:5px;">
-                            ENTRAR AHORA
-                        </button>
+                        <button onclick="connectAndJoin()" class="btn-cyber bg-purple-500 text-sm py-2" style="background: linear-gradient(to bottom, #c084fc 0%, #9333ea 100%); border-color: #6b21a8; margin-top:5px;">ENTRAR AHORA</button>
                     </div>
                 </div>
             </div>
 
-            <!-- LOBBY -->
             <div id="lobbyMenu" class="ui-overlay hidden">
                 <div class="w-96 p-6 bg-slate-900 border border-slate-700 rounded-xl text-center">
                     <h2 class="text-2xl font-bold text-blue-400 mb-2 tracking-widest">SALA DE ESPERA</h2>
                     <p class="text-gray-400 mb-6 text-sm">CÓDIGO: <span id="lobbyCodeDisplay" class="text-yellow-400 font-bold text-xl">----</span></p>
                     <div id="playerList" class="max-h-60 overflow-y-auto mb-6 pr-2 text-left"></div>
-                    <div id="hostControls" class="hidden">
-                        <button onclick="requestStartGame()" class="btn-cyber">INICIAR PARTIDA</button>
-                    </div>
-                    <div id="guestControls" class="hidden">
-                         <p class="text-yellow-500 animate-pulse font-bold">ESPERANDO AL HOST...</p>
-                    </div>
+                    <div id="hostControls" class="hidden"><button onclick="requestStartGame()" class="btn-cyber">INICIAR PARTIDA</button></div>
+                    <div id="guestControls" class="hidden"><p class="text-yellow-500 animate-pulse font-bold">ESPERANDO AL HOST...</p></div>
                 </div>
             </div>
 
@@ -159,24 +211,11 @@
 
         <div id="sideHud" class="hidden">
             <h2 class="text-xl font-bold text-center text-white border-b border-gray-600 pb-2 mb-2 tracking-widest" id="hudName">PLAYER</h2>
-            <div class="stat-box" style="border-color: #ef4444;">
-                <div><div class="stat-label">POTENCIA</div><div class="text-xs text-red-400">Rango de fuego</div></div>
-                <div class="stat-val text-red-500">🔥 <span id="hudRange">1</span></div>
-            </div>
-            <div class="stat-box" style="border-color: #3b82f6;">
-                <div><div class="stat-label">BOMBAS</div><div class="text-xs text-blue-400">Simultáneas</div></div>
-                <div class="stat-val text-blue-500">💣 <span id="hudBombs">1</span></div>
-            </div>
-            <div class="stat-box" style="border-color: #eab308;">
-                <div><div class="stat-label">VELOCIDAD</div><div class="text-xs text-yellow-400">Movimiento</div></div>
-                <div class="stat-val text-yellow-500">⚡ <span id="hudSpeed">NORMAL</span></div>
-            </div>
-            <div id="hudKick" class="stat-box hidden" style="border-color: #22c55e; background: rgba(34, 197, 94, 0.1);">
-                <div class="w-full text-center text-green-400 font-bold tracking-widest">👟 KICKER ACTIVO</div>
-            </div>
-            <div id="hudGhost" class="stat-box hidden" style="border-color: #a855f7; background: rgba(168, 85, 247, 0.1);">
-                <div class="w-full text-center text-purple-400 font-bold tracking-widest animate-pulse">👻 GHOST MODE</div>
-            </div>
+            <div class="stat-box" style="border-color: #ef4444;"><div><div class="stat-label">POTENCIA</div><div class="text-xs text-red-400">Rango</div></div><div class="stat-val text-red-500">🔥 <span id="hudRange">1</span></div></div>
+            <div class="stat-box" style="border-color: #3b82f6;"><div><div class="stat-label">BOMBAS</div><div class="text-xs text-blue-400">Total</div></div><div class="stat-val text-blue-500">💣 <span id="hudBombs">1</span></div></div>
+            <div class="stat-box" style="border-color: #eab308;"><div><div class="stat-label">VELOCIDAD</div><div class="text-xs text-yellow-400">Move</div></div><div class="stat-val text-yellow-500">⚡ <span id="hudSpeed">NORMAL</span></div></div>
+            <div id="hudKick" class="stat-box hidden" style="border-color: #22c55e; background: rgba(34, 197, 94, 0.1);"><div class="w-full text-center text-green-400 font-bold tracking-widest">👟 KICKER ACTIVO</div></div>
+            <div id="hudGhost" class="stat-box hidden" style="border-color: #a855f7; background: rgba(168, 85, 247, 0.1);"><div class="w-full text-center text-purple-400 font-bold tracking-widest animate-pulse">👻 GHOST (<span id="hudGhostTimer">15</span>s)</div></div>
         </div>
     </div>
 
@@ -195,8 +234,8 @@
         let particles = [];
         let gameRunning = false;
         let playerTargets = {}; 
+        let ghostInterval = null;
         
-        // URL DEL SERVIDOR EN RENDER
         const SERVER_URL = "wss://bomber-server-xnox.onrender.com";
 
         const COLORS = {
@@ -226,19 +265,38 @@
             socket.onerror = () => alert("Error conectando al servidor.");
         }
 
+        // --- FIXED RESIZE FUNCTION ---
         function resizeCanvas(size) {
             gridSize = size;
             canvas.width = size * TILE;
             canvas.height = size * TILE;
+            
             const wrapper = document.getElementById('gameWrapper');
-            const availableWidth = window.innerWidth - 300; 
+            // Detectar si es móvil (ancho < 1024) para restar menos espacio
+            const isMobile = window.innerWidth < 1024;
+            
+            // Calculamos espacio disponible
+            // En PC: restamos 300px del HUD lateral y 40px de márgenes
+            // En Móvil: restamos solo 20px de márgenes laterales y 40px verticales
+            const availableWidth = window.innerWidth - (isMobile ? 20 : 300); 
             const availableHeight = window.innerHeight - 40;
+            
+            // Calculamos la escala manteniendo la proporción
             const scale = Math.min(availableHeight / canvas.height, availableWidth / canvas.width);
+            
             wrapper.style.width = canvas.width + "px";
             wrapper.style.height = canvas.height + "px";
+            
+            // Aplicamos escala
+            // IMPORTANTE: transformOrigin siempre en 'center center' para evitar recortes al centrar con flexbox
             wrapper.style.transform = `scale(${Math.min(scale, 1)})`; 
-            wrapper.style.transformOrigin = "center left";
+            wrapper.style.transformOrigin = "center center"; 
         }
+        
+        // Listener para redimensionar si cambia el tamaño de ventana
+        window.addEventListener('resize', () => {
+             if(gridSize) resizeCanvas(gridSize);
+        });
 
         function handleMsg(data) {
             switch(data.type) {
@@ -264,10 +322,9 @@
                     map = data.map; players = data.players; bombs = []; hostId = data.host_id;
                     resizeCanvas(data.grid_size);
                     hideMsg(); localSpeed = 6; updateLobby();
-                    document.getElementById('hudRange').innerText = "1";
-                    document.getElementById('hudBombs').innerText = "1";
-                    document.getElementById('hudSpeed').innerText = "NORMAL";
+                    updateStatsUI({range:1, max_bombs:1}, "NORMAL");
                     document.getElementById('hudGhost').classList.add('hidden');
+                    document.getElementById('mGhost').classList.add('hidden');
                     document.getElementById('hudKick').classList.add('hidden');
                     break;
                 case 'bombs_update': bombs = data.bombs; break;
@@ -302,15 +359,51 @@
                 case 'powerup':
                     if(data.id === myId) {
                         const p = players[myId];
-                        if(data.kind === 'SPEED') { localSpeed = Math.min(localSpeed+2, 14); document.getElementById('hudSpeed').innerText = "TURBO"; }
-                        if(data.kind === 'FIRE') { p.range = (p.range||1)+1; document.getElementById('hudRange').innerText = p.range; }
-                        if(data.kind === 'AMMO') { p.max_bombs = (p.max_bombs||1)+1; document.getElementById('hudBombs').innerText = p.max_bombs; }
-                        if(data.kind === 'GHOST') { p.ghost = true; document.getElementById('hudGhost').classList.remove('hidden'); }
+                        if(data.kind === 'SPEED') { localSpeed = Math.min(localSpeed+2, 14); updateStatsUI(p, "TURBO"); }
+                        if(data.kind === 'FIRE') { p.range = (p.range||1)+1; updateStatsUI(p); }
+                        if(data.kind === 'AMMO') { p.max_bombs = (p.max_bombs||1)+1; updateStatsUI(p); }
+                        if(data.kind === 'GHOST') { p.ghost = true; startGhostTimer(); }
                         if(data.kind === 'KICK') { p.kick = true; document.getElementById('hudKick').classList.remove('hidden'); }
                     }
                     break;
+                case 'powerup_expired':
+                    if(data.id === myId && data.kind === 'GHOST') { players[myId].ghost = false; stopGhostTimer(); }
+                    break;
                 case 'game_over': showMsg(data.winner_id === myId ? "¡VICTORIA!" : "FIN DE RONDA", `Ganador: ${data.winner_name || 'Nadie'}`, true); break;
             }
+        }
+
+        function updateStatsUI(p, speedText) {
+            document.getElementById('hudRange').innerText = p.range || 1;
+            document.getElementById('mRange').innerText = p.range || 1;
+            document.getElementById('hudBombs').innerText = p.max_bombs || 1;
+            document.getElementById('mBombs').innerText = p.max_bombs || 1;
+            if(speedText) {
+                document.getElementById('hudSpeed').innerText = speedText;
+                document.getElementById('mSpeed').innerText = speedText[0];
+            }
+        }
+
+        function startGhostTimer() {
+            document.getElementById('hudGhost').classList.remove('hidden');
+            document.getElementById('mGhost').classList.remove('hidden');
+            let timeLeft = 15;
+            document.getElementById('hudGhostTimer').innerText = timeLeft;
+            document.getElementById('ghostTimer').innerText = timeLeft;
+            
+            if(ghostInterval) clearInterval(ghostInterval);
+            ghostInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('hudGhostTimer').innerText = timeLeft;
+                document.getElementById('ghostTimer').innerText = timeLeft;
+                if(timeLeft <= 0) stopGhostTimer();
+            }, 1000);
+        }
+
+        function stopGhostTimer() {
+            if(ghostInterval) clearInterval(ghostInterval);
+            document.getElementById('hudGhost').classList.add('hidden');
+            document.getElementById('mGhost').classList.add('hidden');
         }
 
         function toggleMenu(id) {
@@ -332,7 +425,7 @@
         function startGameUI() { 
             gameRunning = true; 
             toggleMenu(null); 
-            document.getElementById('sideHud').classList.remove('hidden');
+            document.getElementById('sideHud').classList.remove('hidden'); 
             requestAnimationFrame(gameLoop); 
         }
         function showMsg(t, s, isWin) { 
@@ -352,14 +445,26 @@
         }
 
         let keys = {}, localSpeed = 6, lastSend = 0;
+        
         window.onkeydown = e => { 
             keys[e.key] = true; 
-            if((e.key === '0' || e.key === ' ') && gameRunning && players[myId]?.alive) {
-                const p = players[myId];
-                socket.send(JSON.stringify({ type: 'bomb', x: Math.round(p.x/TILE)*TILE, y: Math.round(p.y/TILE)*TILE }));
-            }
+            if((e.key === '0' || e.key === ' ') && gameRunning && players[myId]?.alive) tryPlaceBomb();
         };
         window.onkeyup = e => keys[e.key] = false;
+
+        document.querySelectorAll('.d-btn').forEach(btn => {
+            btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[btn.dataset.key] = true; });
+            btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[btn.dataset.key] = false; });
+        });
+        document.querySelector('.action-btn').addEventListener('touchstart', (e) => { 
+            e.preventDefault(); 
+            if(gameRunning && players[myId]?.alive) tryPlaceBomb(); 
+        });
+
+        function tryPlaceBomb() {
+            const p = players[myId];
+            socket.send(JSON.stringify({ type: 'bomb', x: Math.round(p.x/TILE)*TILE, y: Math.round(p.y/TILE)*TILE }));
+        }
 
         function handleInput() {
             if(!gameRunning || !players[myId]?.alive) return;
@@ -375,9 +480,6 @@
             const size = 40; 
             const offset = (TILE - size) / 2; 
 
-            // Pasar posición ACTUAL a la función de colisión
-            // Esto es crucial: le decimos a la función "¿Donde estoy AHORA?"
-            // para que compruebe si YA estoy tocando la bomba.
             if(dx !== 0) {
                 if(!checkRectCollision(p.x + dx + offset, p.y + offset, size, size, p.ghost, p.x + offset, p.y + offset)) {
                     p.x += dx;
@@ -415,54 +517,29 @@
             if(now - lastSend > 30) { socket.send(JSON.stringify({ type: 'move', x: p.x, y: p.y })); lastSend = now; }
         }
 
-        // --- CORRECCIÓN DEFINITIVA DE COLISIÓN BOMBAS ---
-        // curX, curY: La posición (top-left del hitbox) DONDE ESTÁS AHORA MISMO
         function checkRectCollision(targetX, targetY, w, h, ghost, curX, curY) {
             const left = Math.floor(targetX / TILE);
             const right = Math.floor((targetX + w - 0.1) / TILE);
             const top = Math.floor(targetY / TILE);
             const bottom = Math.floor((targetY + h - 0.1) / TILE);
-
-            // Bounding box actual del jugador (para saber si ya está dentro de algo)
-            const playerLeft = curX;
-            const playerRight = curX + w;
-            const playerTop = curY;
-            const playerBottom = curY + h;
+            const playerLeft = curX, playerRight = curX + w, playerTop = curY, playerBottom = curY + h;
 
             for(let gy = top; gy <= bottom; gy++) {
                 for(let gx = left; gx <= right; gx++) {
-                    // 1. Paredes y Límites
                     if(gy < 0 || gy >= gridSize || gx < 0 || gx >= gridSize) return true;
                     const cell = map[gy][gx];
                     if(cell === 1) return true; 
                     if(cell === 2 && !ghost) return true; 
 
-                    // 2. Bombas (Lógica de Escape Mejorada)
                     if(!ghost) {
                         for (let b of bombs) {
                             const bx = Math.round(b.x / TILE);
                             const by = Math.round(b.y / TILE);
-                            
-                            // Si la celda que estamos revisando tiene una bomba...
                             if (bx === gx && by === gy) {
-                                // Calculamos el rectángulo de la bomba
-                                const bombLeft = bx * TILE;
-                                const bombRight = bombLeft + TILE;
-                                const bombTop = by * TILE;
-                                const bombBottom = bombTop + TILE;
-
-                                // VERIFICAMOS SI YA ESTAMOS DENTRO DE ELLA
-                                // (Intersección de rectángulos: AABB check)
-                                const isCurrentlyOverlapping = 
-                                    playerLeft < bombRight &&
-                                    playerRight > bombLeft &&
-                                    playerTop < bombBottom &&
-                                    playerBottom > bombTop;
-
-                                if (isCurrentlyOverlapping) {
-                                    continue; // Si ya estoy tocándola, ignoro su solidez
-                                }
-                                return true; // Si NO la estoy tocando, es sólida como una roca
+                                const bombLeft = bx * TILE, bombRight = bombLeft + TILE, bombTop = by * TILE, bombBottom = bombTop + TILE;
+                                const isCurrentlyOverlapping = playerLeft < bombRight && playerRight > bombLeft && playerTop < bombBottom && playerBottom > bombTop;
+                                if (isCurrentlyOverlapping) continue; 
+                                return true; 
                             }
                         }
                     }
@@ -472,36 +549,28 @@
         }
 
         function drawRoundRect(ctx, x, y, w, h, r) {
-            if (w < 2 * r) r = w / 2;
-            if (h < 2 * r) r = h / 2;
-            ctx.beginPath();
-            ctx.moveTo(x + r, y);
-            ctx.arcTo(x + w, y, x + w, y + h, r);
-            ctx.arcTo(x + w, y + h, x, y + h, r);
-            ctx.arcTo(x, y + h, x, y, r);
-            ctx.arcTo(x, y, x + w, y, r);
-            ctx.closePath();
-            ctx.fill();
+            if (w < 2 * r) r = w / 2; if (h < 2 * r) r = h / 2;
+            ctx.beginPath(); ctx.moveTo(x + r, y);
+            ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+            ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r);
+            ctx.closePath(); ctx.fill();
         }
 
         function gameLoop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             handleInput();
-            
             for(let id in playerTargets) {
                 if(players[id]) {
                     players[id].x += (playerTargets[id].x - players[id].x) * 0.25;
                     players[id].y += (playerTargets[id].y - players[id].y) * 0.25;
                 }
             }
-
             for(let y=0; y<gridSize; y++) {
                 for(let x=0; x<gridSize; x++) {
                     ctx.fillStyle = (x+y)%2 === 0 ? COLORS.FLOOR_1 : COLORS.FLOOR_2;
                     ctx.fillRect(x*TILE, y*TILE, TILE, TILE);
                 }
             }
-            
             for(let y=0; y<gridSize; y++) {
                 for(let x=0; x<gridSize; x++) {
                     const t = map[y][x];
@@ -512,14 +581,9 @@
                     else if(t >= 3) drawItem(px, py, t);
                 }
             }
-
             const time = Date.now();
             bombs.forEach(b => drawBomb(b.x + TILE/2, b.y + TILE/2, time));
-
-            Object.values(players).forEach(p => {
-                if(p.alive) drawCharacter(p, p.x + TILE/2, p.y + TILE/2, time);
-            });
-
+            Object.values(players).forEach(p => { if(p.alive) drawCharacter(p, p.x + TILE/2, p.y + TILE/2, time); });
             updateParticles();
             if(gameRunning) requestAnimationFrame(gameLoop);
         }
@@ -531,7 +595,6 @@
             [[8,8],[56,8],[8,44],[56,44]].forEach(p=> {ctx.beginPath();ctx.arc(x+p[0],y+p[1],3,0,7);ctx.fill()});
             ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(x+10, y+20, 44, 24);
         }
-
         function drawSoftWall(x, y, isGhost) {
             ctx.globalAlpha = isGhost ? 0.6 : 1.0;
             ctx.fillStyle = COLORS.WALL_SOFT_SIDE; ctx.fillRect(x, y+10, TILE, TILE-10);
@@ -541,7 +604,6 @@
             ctx.fillRect(x+32, y, 4, 15); ctx.fillRect(x+15, y+15, 4, 20); ctx.fillRect(x+45, y+15, 4, 20);
             ctx.globalAlpha = 1.0;
         }
-
         function drawBomb(x, y, time) {
             const pulse = Math.sin(time * 0.015) * 0.1 + 1;
             ctx.translate(x, y); ctx.scale(pulse, pulse);
@@ -552,58 +614,45 @@
             ctx.fillStyle = (time % 200 < 100) ? '#ff4500' : '#ffcc00'; ctx.beginPath(); ctx.arc(0, -22, 4, 0, 7); ctx.fill();
             ctx.setTransform(1,0,0,1,0,0);
         }
-
         function drawCharacter(p, x, y, time) {
             const walk = Math.sin(time * 0.02);
             const moving = Math.abs(p.x-(p._lx||p.x))>0.1 || Math.abs(p.y-(p._ly||p.y))>0.1;
             p._lx=p.x; p._ly=p.y;
             const off = moving ? walk*6 : 0;
             const bob = moving ? Math.abs(walk)*2 : 0;
-
             ctx.translate(x, y);
             if(p.ghost) { ctx.shadowBlur=15; ctx.shadowColor=p.color; ctx.globalAlpha=0.8; }
-            
             ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(0, 20, 14, 5, 0, 0, 7); ctx.fill(); 
-
             ctx.fillStyle = p.color;
             ctx.beginPath(); ctx.arc(-8, 18+off, 6, 0, 7); ctx.fill(); 
             ctx.beginPath(); ctx.arc(8, 18-off, 6, 0, 7); ctx.fill(); 
-            
             ctx.translate(0, -bob);
             ctx.fillStyle = p.color; 
             drawRoundRect(ctx, -10, 5, 20, 14, 4); 
             ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(-6, 8, 12, 6); 
-            
             ctx.beginPath(); ctx.arc(0, -6, 15, 0, 7); ctx.fill(); 
             const vg = ctx.createLinearGradient(-10, -10, 10, 0); vg.addColorStop(0,'#111'); vg.addColorStop(0.5,'#fbcfe8'); vg.addColorStop(1,'#111');
             ctx.fillStyle = vg; 
             drawRoundRect(ctx, -10, -12, 20, 10, 4);
             ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(0, -22, 3, 0, 7); ctx.fill(); 
-            
             ctx.fillStyle = 'white'; 
             ctx.beginPath(); ctx.arc(-14, 6-off, 5, 0, 7); ctx.fill(); 
             ctx.beginPath(); ctx.arc(14, 6+off, 5, 0, 7); ctx.fill(); 
-
             ctx.setTransform(1,0,0,1,0,0);
-            
             ctx.fillStyle = "white"; ctx.font = "bold 11px Orbitron"; ctx.textAlign = "center";
             ctx.shadowColor="black"; ctx.shadowBlur=4; ctx.fillText(p.nickname, x, y - 35); ctx.shadowBlur=0;
         }
-
         function drawItem(x, y, t) {
             const icons = {3:'🔥', 4:'⚡', 5:'👻', 6:'👟', 7:'💣'};
             const colors = {3:'#ef4444', 4:'#3b82f6', 5:'#a855f7', 6:'#22c55e', 7:'#3b82f6'};
             const bounce = Math.sin(Date.now()*0.005)*3;
-            
             ctx.shadowBlur = 15; ctx.shadowColor = colors[t];
             ctx.fillStyle = colors[t];
             ctx.beginPath(); ctx.arc(x+32, y+32+bounce, 18, 0, 7); ctx.fill();
-            
             ctx.fillStyle = 'white'; ctx.textAlign='center'; ctx.font='22px Arial';
             ctx.fillText(icons[t], x+32, y+39+bounce);
             ctx.shadowBlur = 0;
         }
-
         function spawnExplosion(x, y) { for(let i=0; i<25; i++) particles.push({ x, y, vx:(Math.random()-0.5)*14, vy:(Math.random()-0.5)*14, l:1, c:`hsl(${Math.random()*40+10},100%,50%)`, s:Math.random()*25+5 }); }
         function spawnDebris(x, y) { for(let i=0; i<10; i++) particles.push({ x, y, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, l:0.8, c:'#92400e', s:Math.random()*8+2 }); }
         function spawnDeath(x, y, c) { for(let i=0; i<40; i++) particles.push({ x, y, vx:(Math.random()-0.5)*18, vy:(Math.random()-0.5)*18, l:1.5, c:c, s:Math.random()*10+4 }); }
