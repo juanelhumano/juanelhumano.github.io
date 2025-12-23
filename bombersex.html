@@ -1,360 +1,621 @@
-import asyncio
-import json
-import uuid
-import random
-import os
-from aiohttp import web, WSMsgType
-
-# Constantes base
-WALL_HARD = 1
-WALL_SOFT = 2
-FLOOR = 0
-ITEM_FIRE = 3
-ITEM_SPEED = 4
-ITEM_GHOST = 5
-ITEM_KICK = 6 
-ITEM_AMMO = 7
-
-class GameRoom:
-    def __init__(self, room_id):
-        self.room_id = room_id
-        self.clients = {} 
-        self.players = {} 
-        self.game_started = False
-        self.grid_size = 15
-        self.map = []
-        self.bombs = [] 
-        self.regenerate_map(15)
-        self.physics_task = asyncio.create_task(self.physics_loop())
-
-    def stop(self):
-        if self.physics_task:
-            self.physics_task.cancel()
-
-    def regenerate_map(self, size):
-        self.grid_size = size
-        self.map = [[0 for _ in range(size)] for _ in range(size)]
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bomberman Online: Battle Rooms</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            background: #0f172a;
+            color: white; font-family: 'Orbitron', sans-serif;
+            overflow: hidden; height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+        }
         
-        for y in range(size):
-            for x in range(size):
-                if x == 0 or x == size-1 or y == 0 or y == size-1:
-                    self.map[y][x] = WALL_HARD
-                elif x % 2 == 0 and y % 2 == 0:
-                    self.map[y][x] = WALL_HARD
-                elif random.random() < 0.45: 
-                    self.map[y][x] = WALL_SOFT
-                else:
-                    self.map[y][x] = FLOOR
+        #mainContainer {
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+        }
 
-        safe_spots = [
-            (1, 1), (1, 2), (2, 1),
-            (1, size-2), (1, size-3), (2, size-2),
-            (size-2, 1), (size-2, 2), (size-3, 1),
-            (size-2, size-2), (size-2, size-3), (size-3, size-2)
-        ]
-        for (r, c) in safe_spots:
-            if 0 <= r < size and 0 <= c < size:
-                self.map[r][c] = FLOOR
-    
-    def get_start_pos(self, index):
-        s = self.grid_size
-        c1 = (64, 64)
-        c2 = ((s-2)*64, 64)
-        c3 = (64, (s-2)*64)
-        c4 = ((s-2)*64, (s-2)*64)
-        corners = [c1, c2, c3, c4]
-        return corners[index % 4]
+        #gameWrapper {
+            position: relative;
+            box-shadow: 0 0 60px rgba(0, 0, 0, 0.9);
+            border-radius: 12px; overflow: hidden;
+            background: #111; border: 4px solid #334155;
+            transition: all 0.5s ease;
+        }
 
-    async def broadcast(self, message, exclude=None):
-        if not self.clients: return
-        data = json.dumps(message)
-        disconnected = []
-        for ws in list(self.clients.keys()):
-            if ws != exclude:
-                try: 
-                    await ws.send_str(data)
-                except: 
-                    disconnected.append(ws)
+        #sideHud {
+            width: 260px;
+            background: rgba(15, 23, 42, 0.95);
+            border: 2px solid #475569;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: 0 0 25px rgba(0,0,0,0.6);
+        }
         
-        for ws in disconnected: 
-            await self.handle_disconnect(ws)
+        .stat-box {
+            background: rgba(255,255,255,0.05);
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid #facc15;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .stat-label { font-size: 0.75rem; color: #94a3b8; font-weight: bold; }
+        .stat-val { font-size: 1.5rem; font-weight: 900; }
 
-    async def handle_disconnect(self, ws):
-        if ws in self.clients:
-            pid = self.clients[ws]
-            del self.clients[ws]
-            if pid in self.players:
-                del self.players[pid]
-            
-            new_host = list(self.players.keys())[0] if self.players else None
-            
-            await self.broadcast({
-                'type': 'player_left', 
-                'id': pid,
-                'new_host': new_host
-            })
-            await self.check_win_condition()
+        canvas { display: block; background-color: #0f172a; }
 
-    async def physics_loop(self):
-        try:
-            while True:
-                await asyncio.sleep(0.05)
-                if not self.bombs: continue
-                
-                moved = False
-                for b in self.bombs:
-                    # Si la bomba tiene velocidad (fue pateada)
-                    if b.get('vx', 0) != 0 or b.get('vy', 0) != 0:
-                        new_x = b['x'] + b['vx'] * 16
-                        new_y = b['y'] + b['vy'] * 16
-                        
-                        gx = int((new_x + 32) // 64)
-                        gy = int((new_y + 32) // 64)
-                        
-                        collision = False
-                        
-                        # 1. Colisión con Mapa (Paredes)
-                        if 0 <= gx < self.grid_size and 0 <= gy < self.grid_size:
-                            if self.map[gy][gx] != FLOOR:
-                                collision = True
-                        else:
-                            collision = True # Fuera del mapa
-
-                        # 2. Colisión con OTRAS Bombas (Evitar superposición)
-                        if not collision:
-                            for other in self.bombs:
-                                if other is b: continue # No chocar consigo misma
-                                # Si la distancia es muy corta, choca
-                                dist = ((new_x - other['x'])**2 + (new_y - other['y'])**2)**0.5
-                                if dist < 50: # Menos de un tile de distancia
-                                    collision = True
-                                    break
-
-                        if collision:
-                            # Detener bomba y alinear a la rejilla
-                            b['vx'] = 0; b['vy'] = 0
-                            b['x'] = round(b['x'] / 64) * 64
-                            b['y'] = round(b['y'] / 64) * 64
-                            moved = True
-                        else:
-                            # Mover libremente
-                            b['x'] = new_x
-                            b['y'] = new_y
-                            moved = True
-                
-                if moved:
-                    await self.broadcast({'type': 'bombs_update', 'bombs': self.bombs})
-        except asyncio.CancelledError:
-            pass
-
-    async def bomb_logic(self, bomb_obj):
-        await asyncio.sleep(3.0)
-        if bomb_obj not in self.bombs: return
-        self.bombs.remove(bomb_obj)
-        await self.broadcast({'type': 'bombs_update', 'bombs': self.bombs})
+        .ui-overlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: rgba(15, 23, 42, 0.98); z-index: 50;
+        }
+        .hidden { display: none !important; }
         
-        bx, by = bomb_obj['x'], bomb_obj['y']
-        brange = bomb_obj['range']
-        gx, gy = int((bx+32) // 64), int((by+32) // 64)
-        explosion_cells = []
-        directions = [(0,0), (0,-1), (0,1), (-1,0), (1,0)]
+        input.cyber-input {
+            background: #1e293b; border: 2px solid #334155; color: #fff;
+            padding: 12px; width: 100%; margin-bottom: 10px; border-radius: 8px;
+            font-family: 'Orbitron', sans-serif; text-align: center;
+            transition: border-color 0.2s;
+        }
+        input.cyber-input:focus { border-color: #facc15; outline: none; }
+        
+        .btn-cyber {
+            background: linear-gradient(to bottom, #facc15 0%, #ca8a04 100%);
+            border: none; border-bottom: 4px solid #854d0e;
+            color: #000; font-weight: 900; padding: 12px 30px;
+            border-radius: 8px; cursor: pointer; width: 100%; margin-bottom: 10px;
+            transition: transform 0.1s;
+        }
+        .btn-cyber:active { transform: translateY(4px); border-bottom: 0px; margin-bottom: 14px; }
+        
+        .player-badge {
+            display: flex; align-items: center; gap: 10px;
+            background: rgba(255,255,255,0.05); padding: 8px;
+            border-radius: 4px; margin-bottom: 5px; border: 1px solid rgba(255,255,255,0.1);
+        }
 
-        for dx, dy in directions:
-            for i in range(brange if (dx, dy) != (0,0) else 1):
-                dist = i + 1 if (dx, dy) != (0,0) else 0
-                tx, ty = gx + (dx * dist), gy + (dy * dist)
-                if 0 <= tx < self.grid_size and 0 <= ty < self.grid_size:
-                    cell = self.map[ty][tx]
-                    if cell == WALL_HARD: break
-                    explosion_cells.append({'x': tx * 64, 'y': ty * 64})
+        #joinSection {
+            transition: all 0.3s ease;
+            max-height: 0; overflow: hidden; opacity: 0;
+        }
+        #joinSection.active {
+            max-height: 150px; opacity: 1; margin-top: 10px;
+        }
+        
+        .room-code-display {
+            position: absolute; top: 10px; right: 10px;
+            background: rgba(0,0,0,0.8); color: #facc15;
+            padding: 5px 15px; border-radius: 20px; border: 1px solid #facc15;
+            font-size: 1.2rem; font-weight: bold;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="mainContainer">
+        <div id="gameWrapper">
+            <div id="roomCodeTag" class="room-code-display hidden">SALA: <span id="currentRoomCode">----</span></div>
+            <canvas id="gameCanvas" width="960" height="960"></canvas>
+
+            <!-- MENÚ PRINCIPAL -->
+            <div id="mainMenu" class="ui-overlay">
+                <div class="w-80 p-8 bg-slate-900 border-2 border-slate-700 rounded-2xl shadow-2xl text-center relative">
+                    <h1 class="text-4xl font-black text-white mb-6 italic tracking-tighter">BOMBER<br><span class="text-yellow-500">ARENA</span></h1>
                     
-                    for pid, p in self.players.items():
-                        px, py = int((p['x'] + 32) // 64), int((p['y'] + 32) // 64)
-                        if px == tx and py == ty and p['alive']:
-                            p['alive'] = False
-                            await self.broadcast({'type': 'player_killed', 'id': pid})
-                            asyncio.create_task(self.check_win_condition())
+                    <label class="text-[10px] text-gray-400 font-bold uppercase">Tu Apodo</label>
+                    <input type="text" id="nicknameInput" placeholder="NICKNAME" class="cyber-input" maxlength="10">
+                    
+                    <div class="mt-4 flex flex-col gap-2">
+                        <button onclick="connectAndCreate()" class="btn-cyber bg-green-500" style="background: linear-gradient(to bottom, #4ade80 0%, #16a34a 100%); border-color: #14532d;">
+                            CREAR SALA NUEVA
+                        </button>
+                        <button onclick="toggleJoin()" class="btn-cyber bg-blue-500" style="background: linear-gradient(to bottom, #60a5fa 0%, #2563eb 100%); border-color: #1e3a8a;">
+                            UNIRSE CON CÓDIGO
+                        </button>
+                    </div>
 
-                    for other_b in self.bombs[:]:
-                        obx, oby = int((other_b['x']+32)//64), int((other_b['y']+32)//64)
-                        if obx == tx and oby == ty:
-                            self.bombs.remove(other_b)
-                            await self.broadcast({'type': 'bombs_update', 'bombs': self.bombs})
-                            asyncio.create_task(self.bomb_logic(other_b))
+                    <div id="joinSection">
+                        <label class="text-[10px] text-gray-400 font-bold uppercase mt-2">Código de Sala (4 dígitos)</label>
+                        <input type="number" id="roomCodeInput" placeholder="0000" class="cyber-input text-2xl tracking-widest" style="letter-spacing: 5px;">
+                        <button onclick="connectAndJoin()" class="btn-cyber bg-purple-500 text-sm py-2" style="background: linear-gradient(to bottom, #c084fc 0%, #9333ea 100%); border-color: #6b21a8; margin-top:5px;">
+                            ENTRAR AHORA
+                        </button>
+                    </div>
+                </div>
+            </div>
 
-                    if cell == WALL_SOFT:
-                        drop = FLOOR
-                        roll = random.random()
-                        if roll < 0.20: drop = ITEM_FIRE
-                        elif roll < 0.35: drop = ITEM_SPEED
-                        elif roll < 0.45: drop = ITEM_AMMO
-                        elif roll < 0.50: drop = ITEM_KICK
-                        elif roll < 0.55: drop = ITEM_GHOST
-                        self.map[ty][tx] = drop
-                        await self.broadcast({'type': 'map_update', 'x': tx, 'y': ty, 'val': drop})
-                        break
-        await self.broadcast({'type': 'explosion', 'cells': explosion_cells})
+            <!-- LOBBY -->
+            <div id="lobbyMenu" class="ui-overlay hidden">
+                <div class="w-96 p-6 bg-slate-900 border border-slate-700 rounded-xl text-center">
+                    <h2 class="text-2xl font-bold text-blue-400 mb-2 tracking-widest">SALA DE ESPERA</h2>
+                    <p class="text-gray-400 mb-6 text-sm">CÓDIGO: <span id="lobbyCodeDisplay" class="text-yellow-400 font-bold text-xl">----</span></p>
+                    <div id="playerList" class="max-h-60 overflow-y-auto mb-6 pr-2 text-left"></div>
+                    <div id="hostControls" class="hidden">
+                        <button onclick="requestStartGame()" class="btn-cyber">INICIAR PARTIDA</button>
+                    </div>
+                    <div id="guestControls" class="hidden">
+                         <p class="text-yellow-500 animate-pulse font-bold">ESPERANDO AL HOST...</p>
+                    </div>
+                </div>
+            </div>
 
-    async def check_win_condition(self):
-        if not self.game_started or len(self.players) < 2: return
-        alive = [p for p in self.players.values() if p['alive']]
-        if len(alive) <= 1:
-            winner = alive[0] if alive else None
-            await self.broadcast({'type': 'game_over', 'winner_id': winner['id'] if winner else None, 'winner_name': winner['nickname'] if winner else 'Nadie'})
-            await asyncio.sleep(5)
-            self.game_started = False
-            self.regenerate_map(15) 
-            self.bombs = []
-            idx = 0
-            for pid, p in self.players.items():
-                pos = self.get_start_pos(idx)
-                p.update({"alive": True, "x": pos[0], "y": pos[1], "range": 1, "max_bombs": 1, "ghost": False, "kick": False})
-                idx += 1
-            await self.broadcast({"type": "reset_game", "map": self.map, "players": self.players, "grid_size": self.grid_size, "host_id": list(self.players.keys())[0]})
+            <div id="msgOverlay" class="ui-overlay hidden" style="background: rgba(0,0,0,0.9);">
+                <h1 id="msgTitle" class="text-6xl font-black text-white mb-4">GAME OVER</h1>
+                <p id="msgSub" class="text-2xl text-yellow-400 mb-8">Ganador: ...</p>
+                <button onclick="hideMsg()" class="hidden btn-cyber" style="width:auto; display:inline-block; padding: 10px 40px;" id="errorBtn">ACEPTAR</button>
+            </div>
+        </div>
 
+        <div id="sideHud" class="hidden">
+            <h2 class="text-xl font-bold text-center text-white border-b border-gray-600 pb-2 mb-2 tracking-widest" id="hudName">PLAYER</h2>
+            <div class="stat-box" style="border-color: #ef4444;">
+                <div><div class="stat-label">POTENCIA</div><div class="text-xs text-red-400">Rango de fuego</div></div>
+                <div class="stat-val text-red-500">🔥 <span id="hudRange">1</span></div>
+            </div>
+            <div class="stat-box" style="border-color: #3b82f6;">
+                <div><div class="stat-label">BOMBAS</div><div class="text-xs text-blue-400">Simultáneas</div></div>
+                <div class="stat-val text-blue-500">💣 <span id="hudBombs">1</span></div>
+            </div>
+            <div class="stat-box" style="border-color: #eab308;">
+                <div><div class="stat-label">VELOCIDAD</div><div class="text-xs text-yellow-400">Movimiento</div></div>
+                <div class="stat-val text-yellow-500">⚡ <span id="hudSpeed">NORMAL</span></div>
+            </div>
+            <div id="hudKick" class="stat-box hidden" style="border-color: #22c55e; background: rgba(34, 197, 94, 0.1);">
+                <div class="w-full text-center text-green-400 font-bold tracking-widest">👟 KICKER ACTIVO</div>
+            </div>
+            <div id="hudGhost" class="stat-box hidden" style="border-color: #a855f7; background: rgba(168, 85, 247, 0.1);">
+                <div class="w-full text-center text-purple-400 font-bold tracking-widest animate-pulse">👻 GHOST MODE</div>
+            </div>
+        </div>
+    </div>
 
-# --- GESTOR DE SALAS Y CONEXIONES ---
-active_rooms = {} 
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const TILE = 64;
+        let gridSize = 15;
+        
+        let socket;
+        let myId = null;
+        let hostId = null;
+        let players = {};
+        let map = [];
+        let bombs = [];
+        let particles = [];
+        let gameRunning = false;
+        let playerTargets = {}; 
+        
+        // URL DEL SERVIDOR EN RENDER
+        const SERVER_URL = "wss://bomber-server-xnox.onrender.com";
 
-async def handle_request(request):
-    if request.headers.get('Upgrade', '').lower() != 'websocket':
-        return web.Response(text=f"BomberServer OK - {len(active_rooms)} Rooms Active")
+        const COLORS = {
+            FLOOR_1: '#1e293b', FLOOR_2: '#1a2436',
+            WALL_HARD_SIDE: '#334155', WALL_HARD_TOP: '#475569',
+            WALL_SOFT_SIDE: '#92400e', WALL_SOFT_TOP: '#b45309'
+        };
 
-    ws = web.WebSocketResponse()
-    await ws.prepare(request)
+        function toggleJoin() { document.getElementById('joinSection').classList.toggle('active'); }
+        function connectAndCreate() { initConnection('CREATE'); }
+        function connectAndJoin() {
+            const code = document.getElementById('roomCodeInput').value;
+            if(!code || code.length !== 4) { alert("Introduce un código de 4 dígitos válido."); return; }
+            initConnection('JOIN', code);
+        }
 
-    try:
-        current_room = None
-        msg = await ws.receive()
-        if msg.type == WSMsgType.TEXT:
-            login_data = json.loads(msg.data)
+        function initConnection(action, code=null) {
+            const nick = document.getElementById('nicknameInput').value.trim() || "Player";
+            if(socket) socket.close();
+            console.log("Conectando...");
+            socket = new WebSocket(SERVER_URL);
+            socket.onopen = () => {
+                const payload = { action: action, nickname: nick, code: code };
+                socket.send(JSON.stringify(payload));
+            };
+            socket.onmessage = (e) => handleMsg(JSON.parse(e.data));
+            socket.onerror = () => alert("Error conectando al servidor.");
+        }
+
+        function resizeCanvas(size) {
+            gridSize = size;
+            canvas.width = size * TILE;
+            canvas.height = size * TILE;
+            const wrapper = document.getElementById('gameWrapper');
+            const availableWidth = window.innerWidth - 300; 
+            const availableHeight = window.innerHeight - 40;
+            const scale = Math.min(availableHeight / canvas.height, availableWidth / canvas.width);
+            wrapper.style.width = canvas.width + "px";
+            wrapper.style.height = canvas.height + "px";
+            wrapper.style.transform = `scale(${Math.min(scale, 1)})`; 
+            wrapper.style.transformOrigin = "center left";
+        }
+
+        function handleMsg(data) {
+            switch(data.type) {
+                case 'error': 
+                    showMsg("ERROR", data.message, false);
+                    document.getElementById('errorBtn').classList.remove('hidden'); 
+                    document.getElementById('errorBtn').onclick = () => window.location.reload(); 
+                    if(socket) socket.close();
+                    break;
+                case 'init':
+                    myId = data.id; hostId = data.host_id; players = data.players; map = data.map;
+                    gameRunning = data.game_started;
+                    resizeCanvas(data.grid_size || 15);
+                    toggleMenu('lobbyMenu'); 
+                    document.getElementById('hudName').innerText = document.getElementById('nicknameInput').value.toUpperCase();
+                    document.getElementById('currentRoomCode').innerText = data.room_code;
+                    document.getElementById('lobbyCodeDisplay').innerText = data.room_code;
+                    document.getElementById('roomCodeTag').classList.remove('hidden');
+                    updateLobby();
+                    if(gameRunning) startGameUI();
+                    break;
+                case 'reset_game':
+                    map = data.map; players = data.players; bombs = []; hostId = data.host_id;
+                    resizeCanvas(data.grid_size);
+                    hideMsg(); localSpeed = 6; updateLobby();
+                    document.getElementById('hudRange').innerText = "1";
+                    document.getElementById('hudBombs').innerText = "1";
+                    document.getElementById('hudSpeed').innerText = "NORMAL";
+                    document.getElementById('hudGhost').classList.add('hidden');
+                    document.getElementById('hudKick').classList.add('hidden');
+                    break;
+                case 'bombs_update': bombs = data.bombs; break;
+                case 'player_joined': players[data.player.id] = data.player; updateLobby(); break;
+                case 'player_left': 
+                    delete players[data.id]; delete playerTargets[data.id];
+                    if(data.new_host) hostId = data.new_host;
+                    updateLobby(); break;
+                case 'update_stats': players[data.id] = data.player; updateLobby(); break;
+                case 'start_game_signal': startGameUI(); break;
+                case 'update':
+                    if(players[data.id]) {
+                        if(data.id !== myId) playerTargets[data.id] = { x: data.x, y: data.y };
+                        else {
+                            const dist = Math.hypot(players[myId].x - data.x, players[myId].y - data.y);
+                            if(dist > TILE) { players[myId].x = data.x; players[myId].y = data.y; }
+                        }
+                    }
+                    break;
+                case 'explosion': data.cells.forEach(c => spawnExplosion(c.x+32, c.y+32)); break;
+                case 'map_update': 
+                    map[data.y][data.x] = data.val; 
+                    spawnDebris(data.x*TILE+32, data.y*TILE+32); 
+                    break;
+                case 'player_killed':
+                    if(players[data.id]) {
+                        players[data.id].alive = false;
+                        spawnDeath(players[data.id].x+32, players[data.id].y+32, players[data.id].color);
+                    }
+                    if(data.id === myId) showMsg("ELIMINADO", "¡Cuidado la próxima!", false);
+                    break;
+                case 'powerup':
+                    if(data.id === myId) {
+                        const p = players[myId];
+                        if(data.kind === 'SPEED') { localSpeed = Math.min(localSpeed+2, 14); document.getElementById('hudSpeed').innerText = "TURBO"; }
+                        if(data.kind === 'FIRE') { p.range = (p.range||1)+1; document.getElementById('hudRange').innerText = p.range; }
+                        if(data.kind === 'AMMO') { p.max_bombs = (p.max_bombs||1)+1; document.getElementById('hudBombs').innerText = p.max_bombs; }
+                        if(data.kind === 'GHOST') { p.ghost = true; document.getElementById('hudGhost').classList.remove('hidden'); }
+                        if(data.kind === 'KICK') { p.kick = true; document.getElementById('hudKick').classList.remove('hidden'); }
+                    }
+                    break;
+                case 'game_over': showMsg(data.winner_id === myId ? "¡VICTORIA!" : "FIN DE RONDA", `Ganador: ${data.winner_name || 'Nadie'}`, true); break;
+            }
+        }
+
+        function toggleMenu(id) {
+            ['mainMenu', 'lobbyMenu', 'msgOverlay'].forEach(m => document.getElementById(m).classList.add('hidden'));
+            if(id) document.getElementById(id).classList.remove('hidden');
+        }
+        function updateLobby() {
+            const list = document.getElementById('playerList'); list.innerHTML = '';
+            document.getElementById('hostControls').className = (myId === hostId) ? '' : 'hidden';
+            document.getElementById('guestControls').className = (myId !== hostId) ? '' : 'hidden';
+            Object.values(players).forEach(p => {
+                list.innerHTML += `<div class="player-badge">
+                    <div style="width:16px;height:16px;background:${p.color};border-radius:50%;box-shadow:0 0 5px ${p.color}"></div>
+                    <span class="flex-1 text-sm font-bold text-gray-200">${p.nickname} ${p.id === hostId ? '👑' : ''}</span>
+                </div>`;
+            });
+        }
+        function requestStartGame() { socket.send(JSON.stringify({ type: 'start_trigger' })); }
+        function startGameUI() { 
+            gameRunning = true; 
+            toggleMenu(null); 
+            document.getElementById('sideHud').classList.remove('hidden');
+            requestAnimationFrame(gameLoop); 
+        }
+        function showMsg(t, s, isWin) { 
+            const el = document.getElementById('msgOverlay'); 
+            document.getElementById('msgTitle').innerText = t; 
+            document.getElementById('msgSub').innerText = s;
+            document.getElementById('msgTitle').className = isWin ? "text-6xl font-black text-yellow-400 mb-4 animate-bounce" : "text-6xl font-black text-red-500 mb-4";
+            if(t === "ERROR") {
+                document.getElementById('msgTitle').className = "text-4xl font-bold text-orange-500 mb-4";
+                document.getElementById('msgSub').className = "text-lg text-white mb-8 text-center whitespace-pre-wrap";
+            }
+            el.classList.remove('hidden');
+        }
+        function hideMsg() { 
+            document.getElementById('msgOverlay').classList.add('hidden'); 
+            document.getElementById('errorBtn').classList.add('hidden');
+        }
+
+        let keys = {}, localSpeed = 6, lastSend = 0;
+        window.onkeydown = e => { 
+            keys[e.key] = true; 
+            if((e.key === '0' || e.key === ' ') && gameRunning && players[myId]?.alive) {
+                const p = players[myId];
+                socket.send(JSON.stringify({ type: 'bomb', x: Math.round(p.x/TILE)*TILE, y: Math.round(p.y/TILE)*TILE }));
+            }
+        };
+        window.onkeyup = e => keys[e.key] = false;
+
+        function handleInput() {
+            if(!gameRunning || !players[myId]?.alive) return;
+            const p = players[myId];
             
-            if login_data['action'] == 'CREATE':
-                room_id = str(random.randint(1000, 9999))
-                while room_id in active_rooms:
-                    room_id = str(random.randint(1000, 9999))
-                current_room = GameRoom(room_id)
-                active_rooms[room_id] = current_room
-            
-            elif login_data['action'] == 'JOIN':
-                room_id = login_data.get('code')
-                if room_id in active_rooms:
-                    current_room = active_rooms[room_id]
-                else:
-                    await ws.send_json({"type": "error", "message": "❌ Código de sala inválido"})
-                    await ws.close()
-                    return ws
+            let dx = 0, dy = 0;
+            if(keys['w'] || keys['ArrowUp']) dy = -localSpeed;
+            if(keys['s'] || keys['ArrowDown']) dy = localSpeed;
+            if(keys['a'] || keys['ArrowLeft']) dx = -localSpeed;
+            if(keys['d'] || keys['ArrowRight']) dx = localSpeed;
+            if(dx === 0 && dy === 0) return;
 
-            if current_room:
-                if current_room.game_started:
-                     await ws.send_json({"type": "error", "message": "⚠️ PARTIDA EN CURSO ⚠️"})
-                     await ws.close()
-                     return ws
+            const size = 40; 
+            const offset = (TILE - size) / 2; 
 
-                pid = str(uuid.uuid4())[:8]
-                current_room.clients[ws] = pid
-                
-                pos = current_room.get_start_pos(len(current_room.players))
-                colors = ["#ef4444", "#3b82f6", "#22c55e", "#eab308", "#a855f7", "#ec4899"]
-                
-                current_room.players[pid] = {
-                    "id": pid, "nickname": login_data.get('nickname', 'Player')[:12],
-                    "x": pos[0], "y": pos[1], "color": colors[len(current_room.players) % len(colors)],
-                    "alive": True, "range": 1, "max_bombs": 1, "ghost": False, "kick": False
+            // Pasar posición ACTUAL a la función de colisión
+            // Esto es crucial: le decimos a la función "¿Donde estoy AHORA?"
+            // para que compruebe si YA estoy tocando la bomba.
+            if(dx !== 0) {
+                if(!checkRectCollision(p.x + dx + offset, p.y + offset, size, size, p.ghost, p.x + offset, p.y + offset)) {
+                    p.x += dx;
+                } else {
+                    const gridY = Math.round(p.y / TILE) * TILE;
+                    const diff = p.y - gridY;
+                    if(Math.abs(diff) > 4 && Math.abs(diff) < 24) { 
+                        const slideDir = diff > 0 ? -1 : 1; 
+                         if(!checkRectCollision(p.x + offset, p.y + (slideDir*localSpeed) + offset, size, size, p.ghost, p.x + offset, p.y + offset)) {
+                             p.y += slideDir * (localSpeed * 0.7); 
+                         }
+                    }
                 }
+            }
 
-                await ws.send_json({
-                    "type": "init", 
-                    "room_code": current_room.room_id,
-                    "id": pid, 
-                    "players": current_room.players, 
-                    "map": current_room.map, 
-                    "game_started": current_room.game_started, 
-                    "host_id": list(current_room.players.keys())[0], 
-                    "grid_size": current_room.grid_size
-                })
-                await current_room.broadcast({'type': 'player_joined', 'player': current_room.players[pid]}, exclude=ws)
+            if(dy !== 0) {
+                if(!checkRectCollision(p.x + offset, p.y + dy + offset, size, size, p.ghost, p.x + offset, p.y + offset)) {
+                    p.y += dy;
+                } else {
+                    const gridX = Math.round(p.x / TILE) * TILE;
+                    const diff = p.x - gridX;
+                    if(Math.abs(diff) > 4 && Math.abs(diff) < 24) {
+                        const slideDir = diff > 0 ? -1 : 1;
+                        if(!checkRectCollision(p.x + (slideDir*localSpeed) + offset, p.y + offset, size, size, p.ghost, p.x + offset, p.y + offset)) {
+                            p.x += slideDir * (localSpeed * 0.7);
+                        }
+                    }
+                }
+            }
+            
+            p.x = Math.max(0, Math.min(p.x, canvas.width - TILE));
+            p.y = Math.max(0, Math.min(p.y, canvas.height - TILE));
 
-                async for msg in ws:
-                    if msg.type == WSMsgType.TEXT:
-                        data = json.loads(msg.data)
-                        p = current_room.players.get(pid)
-                        if not p: continue
+            const now = Date.now();
+            if(now - lastSend > 30) { socket.send(JSON.stringify({ type: 'move', x: p.x, y: p.y })); lastSend = now; }
+        }
 
-                        if data["type"] == "start_trigger":
-                            cnt = len(current_room.players)
-                            sz = 13 if cnt <= 2 else (19 if cnt >= 5 else 15)
-                            current_room.regenerate_map(sz)
-                            current_room.game_started = True
-                            current_room.bombs = []
-                            idx = 0
-                            for pl in current_room.players.values():
-                                pl['x'], pl['y'] = current_room.get_start_pos(idx)
-                                idx += 1
-                            await current_room.broadcast({"type": "reset_game", "map": current_room.map, "players": current_room.players, "grid_size": sz, "host_id": pid})
-                            await current_room.broadcast({"type": "start_game_signal"})
+        // --- CORRECCIÓN DEFINITIVA DE COLISIÓN BOMBAS ---
+        // curX, curY: La posición (top-left del hitbox) DONDE ESTÁS AHORA MISMO
+        function checkRectCollision(targetX, targetY, w, h, ghost, curX, curY) {
+            const left = Math.floor(targetX / TILE);
+            const right = Math.floor((targetX + w - 0.1) / TILE);
+            const top = Math.floor(targetY / TILE);
+            const bottom = Math.floor((targetY + h - 0.1) / TILE);
 
-                        elif data["type"] == "move" and p['alive']:
-                            gx, gy = int((data['x'] + 32) // 64), int((data['y'] + 32) // 64)
-                            if 0 <= gy < current_room.grid_size and 0 <= gx < current_room.grid_size:
-                                cell = current_room.map[gy][gx]
-                                if cell >= 3:
-                                    kind = 'UNKNOWN'
-                                    if cell == ITEM_FIRE: p['range'] += 1; kind = 'FIRE'
-                                    elif cell == ITEM_SPEED: kind = 'SPEED'
-                                    elif cell == ITEM_GHOST: p['ghost'] = True; kind = 'GHOST'
-                                    elif cell == ITEM_KICK: p['kick'] = True; kind = 'KICK'
-                                    elif cell == ITEM_AMMO: p['max_bombs'] += 1; kind = 'AMMO'
-                                    current_room.map[gy][gx] = FLOOR
-                                    await current_room.broadcast({'type': 'map_update', 'x': gx, 'y': gy, 'val': FLOOR})
-                                    await current_room.broadcast({'type': 'powerup', 'id': pid, 'kind': kind})
+            // Bounding box actual del jugador (para saber si ya está dentro de algo)
+            const playerLeft = curX;
+            const playerRight = curX + w;
+            const playerTop = curY;
+            const playerBottom = curY + h;
 
-                            if p['kick']:
-                                for b in current_room.bombs:
-                                    dist = ((p['x'] - b['x'])**2 + (p['y'] - b['y'])**2)**0.5
-                                    if dist < 40: 
-                                        dx = b['x'] - p['x']; dy = b['y'] - p['y']
-                                        if abs(dx) > abs(dy): b['vx'] = 1 if dx > 0 else -1; b['vy'] = 0
-                                        else: b['vx'] = 0; b['vy'] = 1 if dy > 0 else -1
+            for(let gy = top; gy <= bottom; gy++) {
+                for(let gx = left; gx <= right; gx++) {
+                    // 1. Paredes y Límites
+                    if(gy < 0 || gy >= gridSize || gx < 0 || gx >= gridSize) return true;
+                    const cell = map[gy][gx];
+                    if(cell === 1) return true; 
+                    if(cell === 2 && !ghost) return true; 
 
-                            p["x"], p["y"] = data["x"], data["y"]
-                            await current_room.broadcast({"type": "update", "id": pid, "x": p["x"], "y": p["y"]}, exclude=ws)
+                    // 2. Bombas (Lógica de Escape Mejorada)
+                    if(!ghost) {
+                        for (let b of bombs) {
+                            const bx = Math.round(b.x / TILE);
+                            const by = Math.round(b.y / TILE);
+                            
+                            // Si la celda que estamos revisando tiene una bomba...
+                            if (bx === gx && by === gy) {
+                                // Calculamos el rectángulo de la bomba
+                                const bombLeft = bx * TILE;
+                                const bombRight = bombLeft + TILE;
+                                const bombTop = by * TILE;
+                                const bombBottom = bombTop + TILE;
 
-                        elif data["type"] == "bomb" and p['alive']:
-                            active = sum(1 for b in current_room.bombs if b['owner'] == pid)
-                            if active < p['max_bombs']:
-                                bx, by = data['x'], data['y']
-                                # FIX: Verifica si ya hay bomba ahí antes de ponerla
-                                occ = any(b['x'] == bx and b['y'] == by for b in current_room.bombs)
-                                if not occ:
-                                    nb = {'x': bx, 'y': by, 'range': p['range'], 'owner': pid, 'vx': 0, 'vy': 0}
-                                    current_room.bombs.append(nb)
-                                    asyncio.create_task(current_room.bomb_logic(nb))
-                                    await current_room.broadcast({"type": "bombs_update", "bombs": current_room.bombs})
+                                // VERIFICAMOS SI YA ESTAMOS DENTRO DE ELLA
+                                // (Intersección de rectángulos: AABB check)
+                                const isCurrentlyOverlapping = 
+                                    playerLeft < bombRight &&
+                                    playerRight > bombLeft &&
+                                    playerTop < bombBottom &&
+                                    playerBottom > bombTop;
 
-    finally:
-        if current_room:
-            await current_room.handle_disconnect(ws)
-            if not current_room.clients:
-                current_room.stop()
-                if current_room.room_id in active_rooms:
-                    del active_rooms[current_room.room_id]
+                                if (isCurrentlyOverlapping) {
+                                    continue; // Si ya estoy tocándola, ignoro su solidez
+                                }
+                                return true; // Si NO la estoy tocando, es sólida como una roca
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        }
 
-    return ws
+        function drawRoundRect(ctx, x, y, w, h, r) {
+            if (w < 2 * r) r = w / 2;
+            if (h < 2 * r) r = h / 2;
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.arcTo(x + w, y, x + w, y + h, r);
+            ctx.arcTo(x + w, y + h, x, y + h, r);
+            ctx.arcTo(x, y + h, x, y, r);
+            ctx.arcTo(x, y, x + w, y, r);
+            ctx.closePath();
+            ctx.fill();
+        }
 
-async def main():
-    PORT = int(os.environ.get("PORT", 10000))
-    print(f"🔥 Servidor V18 (Physics Update) - Puerto {PORT}")
-    
-    app = web.Application()
-    app.add_routes([web.get('/', handle_request), web.get('/health', handle_request)])
-    
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', PORT)
-    await site.start()
-    
-    await asyncio.Future()
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            handleInput();
+            
+            for(let id in playerTargets) {
+                if(players[id]) {
+                    players[id].x += (playerTargets[id].x - players[id].x) * 0.25;
+                    players[id].y += (playerTargets[id].y - players[id].y) * 0.25;
+                }
+            }
 
-if __name__ == "__main__":
-    asyncio.run(main())
+            for(let y=0; y<gridSize; y++) {
+                for(let x=0; x<gridSize; x++) {
+                    ctx.fillStyle = (x+y)%2 === 0 ? COLORS.FLOOR_1 : COLORS.FLOOR_2;
+                    ctx.fillRect(x*TILE, y*TILE, TILE, TILE);
+                }
+            }
+            
+            for(let y=0; y<gridSize; y++) {
+                for(let x=0; x<gridSize; x++) {
+                    const t = map[y][x];
+                    if(t === 0) continue;
+                    const px = x*TILE, py = y*TILE;
+                    if(t === 1) drawHardWall(px, py);
+                    else if(t === 2) drawSoftWall(px, py, players[myId]?.ghost);
+                    else if(t >= 3) drawItem(px, py, t);
+                }
+            }
+
+            const time = Date.now();
+            bombs.forEach(b => drawBomb(b.x + TILE/2, b.y + TILE/2, time));
+
+            Object.values(players).forEach(p => {
+                if(p.alive) drawCharacter(p, p.x + TILE/2, p.y + TILE/2, time);
+            });
+
+            updateParticles();
+            if(gameRunning) requestAnimationFrame(gameLoop);
+        }
+
+        function drawHardWall(x, y) {
+            ctx.fillStyle = COLORS.WALL_HARD_SIDE; ctx.fillRect(x, y+12, TILE, TILE-12);
+            ctx.fillStyle = COLORS.WALL_HARD_TOP; ctx.fillRect(x, y, TILE, TILE-12);
+            ctx.fillStyle = '#1e293b';
+            [[8,8],[56,8],[8,44],[56,44]].forEach(p=> {ctx.beginPath();ctx.arc(x+p[0],y+p[1],3,0,7);ctx.fill()});
+            ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(x+10, y+20, 44, 24);
+        }
+
+        function drawSoftWall(x, y, isGhost) {
+            ctx.globalAlpha = isGhost ? 0.6 : 1.0;
+            ctx.fillStyle = COLORS.WALL_SOFT_SIDE; ctx.fillRect(x, y+10, TILE, TILE-10);
+            ctx.fillStyle = COLORS.WALL_SOFT_TOP; ctx.fillRect(x, y, TILE, TILE-10);
+            ctx.fillStyle = 'rgba(50, 20, 0, 0.3)';
+            ctx.fillRect(x, y+15, TILE, 4); ctx.fillRect(x, y+35, TILE, 4);
+            ctx.fillRect(x+32, y, 4, 15); ctx.fillRect(x+15, y+15, 4, 20); ctx.fillRect(x+45, y+15, 4, 20);
+            ctx.globalAlpha = 1.0;
+        }
+
+        function drawBomb(x, y, time) {
+            const pulse = Math.sin(time * 0.015) * 0.1 + 1;
+            ctx.translate(x, y); ctx.scale(pulse, pulse);
+            const grad = ctx.createRadialGradient(-5, -5, 2, 0, 0, 22);
+            grad.addColorStop(0, '#555'); grad.addColorStop(1, '#111');
+            ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 0, 22, 0, 7); ctx.fill();
+            ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.beginPath(); ctx.arc(-8, -8, 6, 0, 7); ctx.fill();
+            ctx.fillStyle = (time % 200 < 100) ? '#ff4500' : '#ffcc00'; ctx.beginPath(); ctx.arc(0, -22, 4, 0, 7); ctx.fill();
+            ctx.setTransform(1,0,0,1,0,0);
+        }
+
+        function drawCharacter(p, x, y, time) {
+            const walk = Math.sin(time * 0.02);
+            const moving = Math.abs(p.x-(p._lx||p.x))>0.1 || Math.abs(p.y-(p._ly||p.y))>0.1;
+            p._lx=p.x; p._ly=p.y;
+            const off = moving ? walk*6 : 0;
+            const bob = moving ? Math.abs(walk)*2 : 0;
+
+            ctx.translate(x, y);
+            if(p.ghost) { ctx.shadowBlur=15; ctx.shadowColor=p.color; ctx.globalAlpha=0.8; }
+            
+            ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(0, 20, 14, 5, 0, 0, 7); ctx.fill(); 
+
+            ctx.fillStyle = p.color;
+            ctx.beginPath(); ctx.arc(-8, 18+off, 6, 0, 7); ctx.fill(); 
+            ctx.beginPath(); ctx.arc(8, 18-off, 6, 0, 7); ctx.fill(); 
+            
+            ctx.translate(0, -bob);
+            ctx.fillStyle = p.color; 
+            drawRoundRect(ctx, -10, 5, 20, 14, 4); 
+            ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(-6, 8, 12, 6); 
+            
+            ctx.beginPath(); ctx.arc(0, -6, 15, 0, 7); ctx.fill(); 
+            const vg = ctx.createLinearGradient(-10, -10, 10, 0); vg.addColorStop(0,'#111'); vg.addColorStop(0.5,'#fbcfe8'); vg.addColorStop(1,'#111');
+            ctx.fillStyle = vg; 
+            drawRoundRect(ctx, -10, -12, 20, 10, 4);
+            ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(0, -22, 3, 0, 7); ctx.fill(); 
+            
+            ctx.fillStyle = 'white'; 
+            ctx.beginPath(); ctx.arc(-14, 6-off, 5, 0, 7); ctx.fill(); 
+            ctx.beginPath(); ctx.arc(14, 6+off, 5, 0, 7); ctx.fill(); 
+
+            ctx.setTransform(1,0,0,1,0,0);
+            
+            ctx.fillStyle = "white"; ctx.font = "bold 11px Orbitron"; ctx.textAlign = "center";
+            ctx.shadowColor="black"; ctx.shadowBlur=4; ctx.fillText(p.nickname, x, y - 35); ctx.shadowBlur=0;
+        }
+
+        function drawItem(x, y, t) {
+            const icons = {3:'🔥', 4:'⚡', 5:'👻', 6:'👟', 7:'💣'};
+            const colors = {3:'#ef4444', 4:'#3b82f6', 5:'#a855f7', 6:'#22c55e', 7:'#3b82f6'};
+            const bounce = Math.sin(Date.now()*0.005)*3;
+            
+            ctx.shadowBlur = 15; ctx.shadowColor = colors[t];
+            ctx.fillStyle = colors[t];
+            ctx.beginPath(); ctx.arc(x+32, y+32+bounce, 18, 0, 7); ctx.fill();
+            
+            ctx.fillStyle = 'white'; ctx.textAlign='center'; ctx.font='22px Arial';
+            ctx.fillText(icons[t], x+32, y+39+bounce);
+            ctx.shadowBlur = 0;
+        }
+
+        function spawnExplosion(x, y) { for(let i=0; i<25; i++) particles.push({ x, y, vx:(Math.random()-0.5)*14, vy:(Math.random()-0.5)*14, l:1, c:`hsl(${Math.random()*40+10},100%,50%)`, s:Math.random()*25+5 }); }
+        function spawnDebris(x, y) { for(let i=0; i<10; i++) particles.push({ x, y, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, l:0.8, c:'#92400e', s:Math.random()*8+2 }); }
+        function spawnDeath(x, y, c) { for(let i=0; i<40; i++) particles.push({ x, y, vx:(Math.random()-0.5)*18, vy:(Math.random()-0.5)*18, l:1.5, c:c, s:Math.random()*10+4 }); }
+        function updateParticles() {
+            particles = particles.filter(p => p.l > 0);
+            particles.forEach(p => {
+                p.x += p.vx; p.y += p.vy; p.l -= 0.04; p.s *= 0.92;
+                ctx.globalAlpha = p.l; ctx.fillStyle = p.c;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, 7); ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+        }
+    </script>
+</body>
+</html>
