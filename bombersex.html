@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bomberman V9: Final Edition</title>
+    <title>Bomberman Online: Rooms</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
@@ -28,7 +28,6 @@
             transition: all 0.5s ease;
         }
 
-        /* HUD LATERAL */
         #sideHud {
             width: 260px;
             background: rgba(15, 23, 42, 0.95);
@@ -66,6 +65,7 @@
             background: #1e293b; border: 2px solid #334155; color: #fff;
             padding: 12px; width: 100%; margin-bottom: 10px; border-radius: 8px;
             font-family: 'Orbitron', sans-serif; text-align: center;
+            transition: border-color 0.2s;
         }
         input.cyber-input:focus { border-color: #facc15; outline: none; }
         
@@ -83,38 +83,73 @@
             background: rgba(255,255,255,0.05); padding: 8px;
             border-radius: 4px; margin-bottom: 5px; border: 1px solid rgba(255,255,255,0.1);
         }
+
+        /* Estilos específicos para inputs de código */
+        #joinSection {
+            transition: all 0.3s ease;
+            max-height: 0; overflow: hidden; opacity: 0;
+        }
+        #joinSection.active {
+            max-height: 150px; opacity: 1; margin-top: 10px;
+        }
+        
+        .room-code-display {
+            position: absolute; top: 10px; right: 10px;
+            background: rgba(0,0,0,0.8); color: #facc15;
+            padding: 5px 15px; border-radius: 20px; border: 1px solid #facc15;
+            font-size: 1.2rem; font-weight: bold;
+            z-index: 10;
+        }
     </style>
 </head>
 <body>
 
     <div id="mainContainer">
         <div id="gameWrapper">
+            <!-- Etiqueta del código de sala (invisible al inicio) -->
+            <div id="roomCodeTag" class="room-code-display hidden">SALA: <span id="currentRoomCode">----</span></div>
+            
             <canvas id="gameCanvas" width="960" height="960"></canvas>
 
-            <!-- MENÚ PRINCIPAL (Ahora con 2 botones) -->
+            <!-- MENÚ PRINCIPAL -->
             <div id="mainMenu" class="ui-overlay">
                 <div class="w-80 p-8 bg-slate-900 border-2 border-slate-700 rounded-2xl shadow-2xl text-center relative">
                     <h1 class="text-4xl font-black text-white mb-6 italic tracking-tighter">BOMBER<br><span class="text-yellow-500">ARENA</span></h1>
                     
-                    <label class="text-[10px] text-gray-400 font-bold uppercase">Nombre de Jugador</label>
+                    <label class="text-[10px] text-gray-400 font-bold uppercase">Tu Apodo</label>
                     <input type="text" id="nicknameInput" placeholder="NICKNAME" class="cyber-input" maxlength="10">
                     
-                    <label class="text-[10px] text-gray-400 font-bold uppercase mt-2">IP del Servidor</label>
-                    <input type="text" id="serverIp" value="localhost" class="cyber-input">
-                    
                     <div class="mt-4 flex flex-col gap-2">
-                        <button onclick="joinGame()" class="btn-cyber bg-green-500" style="background: linear-gradient(to bottom, #4ade80 0%, #16a34a 100%); border-color: #14532d;">CREAR PARTIDA</button>
-                        <button onclick="joinGame()" class="btn-cyber bg-blue-500" style="background: linear-gradient(to bottom, #60a5fa 0%, #2563eb 100%); border-color: #1e3a8a;">UNIRSE A PARTIDA</button>
+                        <!-- Botón CREAR -->
+                        <button onclick="connectAndCreate()" class="btn-cyber bg-green-500" style="background: linear-gradient(to bottom, #4ade80 0%, #16a34a 100%); border-color: #14532d;">
+                            CREAR SALA NUEVA
+                        </button>
+                        
+                        <!-- Botón MOSTRAR UNIRSE -->
+                        <button onclick="toggleJoin()" class="btn-cyber bg-blue-500" style="background: linear-gradient(to bottom, #60a5fa 0%, #2563eb 100%); border-color: #1e3a8a;">
+                            UNIRSE CON CÓDIGO
+                        </button>
                     </div>
-                    <p class="text-[10px] text-gray-500 mt-2">Ambas opciones conectan a la IP especificada.</p>
+
+                    <!-- Sección Desplegable para Unirse -->
+                    <div id="joinSection">
+                        <label class="text-[10px] text-gray-400 font-bold uppercase mt-2">Código de Sala (4 dígitos)</label>
+                        <input type="number" id="roomCodeInput" placeholder="0000" class="cyber-input text-2xl tracking-widest" style="letter-spacing: 5px;">
+                        <button onclick="connectAndJoin()" class="btn-cyber bg-purple-500 text-sm py-2" style="background: linear-gradient(to bottom, #c084fc 0%, #9333ea 100%); border-color: #6b21a8; margin-top:5px;">
+                            ENTRAR AHORA
+                        </button>
+                    </div>
                 </div>
             </div>
 
             <!-- LOBBY -->
             <div id="lobbyMenu" class="ui-overlay hidden">
                 <div class="w-96 p-6 bg-slate-900 border border-slate-700 rounded-xl text-center">
-                    <h2 class="text-2xl font-bold text-blue-400 mb-6 tracking-widest">SALA DE ESPERA</h2>
+                    <h2 class="text-2xl font-bold text-blue-400 mb-2 tracking-widest">SALA DE ESPERA</h2>
+                    <p class="text-gray-400 mb-6 text-sm">CÓDIGO: <span id="lobbyCodeDisplay" class="text-yellow-400 font-bold text-xl">----</span></p>
+                    
                     <div id="playerList" class="max-h-60 overflow-y-auto mb-6 pr-2 text-left"></div>
+                    
                     <div id="hostControls" class="hidden">
                         <button onclick="requestStartGame()" class="btn-cyber">INICIAR PARTIDA</button>
                     </div>
@@ -128,7 +163,7 @@
             <div id="msgOverlay" class="ui-overlay hidden" style="background: rgba(0,0,0,0.9);">
                 <h1 id="msgTitle" class="text-6xl font-black text-white mb-4">GAME OVER</h1>
                 <p id="msgSub" class="text-2xl text-yellow-400 mb-8">Ganador: ...</p>
-                <button onclick="hideMsg()" class="hidden" id="errorBtn">ACEPTAR</button>
+                <button onclick="hideMsg()" class="hidden btn-cyber" style="width:auto; display:inline-block; padding: 10px 40px;" id="errorBtn">ACEPTAR</button>
             </div>
         </div>
 
@@ -177,24 +212,50 @@
         let gameRunning = false;
         let playerTargets = {}; 
         
+        const SERVER_URL = "wss://bomber-server-xnox.onrender.com";
+
         const COLORS = {
             FLOOR_1: '#1e293b', FLOOR_2: '#1a2436',
             WALL_HARD_SIDE: '#334155', WALL_HARD_TOP: '#475569',
             WALL_SOFT_SIDE: '#92400e', WALL_SOFT_TOP: '#b45309'
         };
 
-        function joinGame() {
+        // --- LÓGICA DE MENÚS ---
+        function toggleJoin() {
+            document.getElementById('joinSection').classList.toggle('active');
+        }
+
+        function connectAndCreate() {
+            initConnection('CREATE');
+        }
+
+        function connectAndJoin() {
+            const code = document.getElementById('roomCodeInput').value;
+            if(!code || code.length !== 4) {
+                alert("Introduce un código de 4 dígitos válido.");
+                return;
+            }
+            initConnection('JOIN', code);
+        }
+
+        function initConnection(action, code=null) {
             const nick = document.getElementById('nicknameInput').value.trim() || "Player";
-            const ip = document.getElementById('serverIp').value || "localhost";
             
             if(socket) socket.close();
-            socket = new WebSocket(`ws://${ip}:8080`);
+            console.log("Conectando...");
+            socket = new WebSocket(SERVER_URL);
 
             socket.onopen = () => {
-                socket.send(JSON.stringify({ type: 'set_nickname', name: nick }));
+                // Enviar intención de login INMEDIATAMENTE
+                const payload = { 
+                    action: action, 
+                    nickname: nick,
+                    code: code 
+                };
+                socket.send(JSON.stringify(payload));
             };
             socket.onmessage = (e) => handleMsg(JSON.parse(e.data));
-            socket.onerror = () => alert("No se pudo conectar al servidor.");
+            socket.onerror = () => alert("Error conectando al servidor.");
         }
 
         function resizeCanvas(size) {
@@ -215,12 +276,10 @@
 
         function handleMsg(data) {
             switch(data.type) {
-                case 'error': // Mensaje de rechazo (partida en curso)
+                case 'error': 
                     showMsg("ERROR", data.message, false);
-                    document.getElementById('errorBtn').classList.remove('hidden'); // Mostrar botón aceptar para cerrar msg
-                    document.getElementById('errorBtn').onclick = () => {
-                        window.location.reload(); // Recargar para limpiar
-                    };
+                    document.getElementById('errorBtn').classList.remove('hidden'); 
+                    document.getElementById('errorBtn').onclick = () => window.location.reload(); 
                     if(socket) socket.close();
                     break;
 
@@ -228,8 +287,15 @@
                     myId = data.id; hostId = data.host_id; players = data.players; map = data.map;
                     gameRunning = data.game_started;
                     resizeCanvas(data.grid_size || 15);
-                    toggleMenu('lobbyMenu'); // Ir al lobby
+                    
+                    toggleMenu('lobbyMenu'); 
                     document.getElementById('hudName').innerText = document.getElementById('nicknameInput').value.toUpperCase();
+                    
+                    // Mostrar código de sala
+                    document.getElementById('currentRoomCode').innerText = data.room_code;
+                    document.getElementById('lobbyCodeDisplay').innerText = data.room_code;
+                    document.getElementById('roomCodeTag').classList.remove('hidden');
+
                     updateLobby();
                     if(gameRunning) startGameUI();
                     break;
@@ -318,13 +384,10 @@
             document.getElementById('msgTitle').innerText = t; 
             document.getElementById('msgSub').innerText = s;
             document.getElementById('msgTitle').className = isWin ? "text-6xl font-black text-yellow-400 mb-4 animate-bounce" : "text-6xl font-black text-red-500 mb-4";
-            
-            // Si es un mensaje de error, usamos un estilo diferente
             if(t === "ERROR") {
                 document.getElementById('msgTitle').className = "text-4xl font-bold text-orange-500 mb-4";
                 document.getElementById('msgSub').className = "text-lg text-white mb-8 text-center whitespace-pre-wrap";
             }
-            
             el.classList.remove('hidden');
         }
         function hideMsg() { 
