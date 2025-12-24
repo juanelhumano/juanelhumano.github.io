@@ -141,7 +141,6 @@
     <div id="mainContainer">
         <div id="gameWrapper">
             <div id="roomCodeTag" class="room-code-display hidden">SALA: <span id="currentRoomCode">----</span></div>
-            <!-- TIMER DISPLAY: 06:00 -->
             <div id="gameTimer" class="hidden">06:00</div>
 
             <div id="mobileHud">
@@ -193,6 +192,10 @@
             <div id="msgOverlay" class="ui-overlay hidden" style="background: rgba(0,0,0,0.9);">
                 <h1 id="msgTitle" class="text-6xl font-black text-white mb-4">GAME OVER</h1>
                 <p id="msgSub" class="text-2xl text-yellow-400 mb-8">Ganador: ...</p>
+                <div id="gameOverButtons" class="flex flex-col gap-3 w-full max-w-xs">
+                    <button id="btnRestart" onclick="triggerRestart()" class="hidden btn-cyber bg-blue-600 border-blue-800">REINICIAR SALA</button>
+                    <button id="btnExit" onclick="exitToMenu()" class="btn-cyber bg-red-600 border-red-800">SALIR AL MENÚ</button>
+                </div>
                 <button onclick="hideMsg()" class="hidden btn-cyber" style="width:auto; display:inline-block; padding: 10px 40px;" id="errorBtn">ACEPTAR</button>
             </div>
         </div>
@@ -300,7 +303,6 @@
                     document.getElementById('hudGhost').classList.add('hidden');
                     document.getElementById('mGhost').classList.add('hidden');
                     document.getElementById('hudKick').classList.add('hidden');
-                    // Reset Timer UI
                     document.getElementById('gameTimer').innerText = "06:00";
                     document.getElementById('gameTimer').classList.remove('danger');
                     break;
@@ -346,18 +348,37 @@
                 case 'powerup_expired':
                     if(data.id === myId && data.kind === 'GHOST') { players[myId].ghost = false; stopGhostTimer(); }
                     break;
-                case 'game_over': showMsg(data.winner_id === myId ? "¡VICTORIA!" : "FIN DE RONDA", `Ganador: ${data.winner_name || 'Nadie'}`, true); break;
-                // NUEVO: ACTUALIZACIÓN DE TIMER
+                case 'game_over': 
+                    showMsg(data.winner_id === myId ? "¡VICTORIA!" : "FIN DE RONDA", `Ganador: ${data.winner_name || 'Nadie'}`, true);
+                    
+                    // Lógica para botones
+                    document.getElementById('gameOverButtons').classList.remove('hidden');
+                    document.getElementById('errorBtn').classList.add('hidden');
+
+                    if(myId === hostId) {
+                        document.getElementById('btnRestart').classList.remove('hidden');
+                    } else {
+                        document.getElementById('btnRestart').classList.add('hidden');
+                    }
+                    break;
                 case 'timer_update':
                     const t = data.time;
                     const mins = Math.floor(t / 60).toString().padStart(2, '0');
                     const secs = (t % 60).toString().padStart(2, '0');
                     const timerEl = document.getElementById('gameTimer');
                     timerEl.innerText = `${mins}:${secs}`;
-                    if(t <= 90) timerEl.classList.add('danger'); // 90s chaos
+                    if(t <= 90) timerEl.classList.add('danger');
                     else timerEl.classList.remove('danger');
                     break;
             }
+        }
+        
+        function triggerRestart() {
+            socket.send(JSON.stringify({ type: 'request_restart' }));
+        }
+
+        function exitToMenu() {
+            window.location.reload();
         }
 
         function updateStatsUI(p, speedText) {
@@ -420,10 +441,18 @@
             document.getElementById('msgTitle').innerText = t; 
             document.getElementById('msgSub').innerText = s;
             document.getElementById('msgTitle').className = isWin ? "text-6xl font-black text-yellow-400 mb-4 animate-bounce" : "text-6xl font-black text-red-500 mb-4";
+            
+            // Ocultar botones por defecto (se muestran solo en Game Over real)
+            document.getElementById('gameOverButtons').classList.add('hidden');
+            
             if(t === "ERROR") {
                 document.getElementById('msgTitle').className = "text-4xl font-bold text-orange-500 mb-4";
                 document.getElementById('msgSub').className = "text-lg text-white mb-8 text-center whitespace-pre-wrap";
+            } else if (t === "ELIMINADO") {
+                 // Si solo es "Eliminado" pero el juego sigue, no mostrar botones de reset
+                 // Solo dejarlo ahí
             }
+
             el.classList.remove('hidden');
         }
         function hideMsg() { 
