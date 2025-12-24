@@ -123,7 +123,6 @@
             border-radius: 20px; gap: 15px; pointer-events: none; z-index: 5;
         }
 
-        /* --- NUEVO: Estilos del Timer --- */
         #gameTimer {
             position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
             background: rgba(0,0,0,0.8); padding: 5px 20px; border-radius: 20px;
@@ -142,8 +141,8 @@
     <div id="mainContainer">
         <div id="gameWrapper">
             <div id="roomCodeTag" class="room-code-display hidden">SALA: <span id="currentRoomCode">----</span></div>
-            <!-- TIMER DISPLAY -->
-            <div id="gameTimer" class="hidden">04:00</div>
+            <!-- TIMER DISPLAY: 06:00 -->
+            <div id="gameTimer" class="hidden">06:00</div>
 
             <div id="mobileHud">
                 <span class="text-red-400 font-bold">🔥 <span id="mRange">1</span></span>
@@ -301,8 +300,8 @@
                     document.getElementById('hudGhost').classList.add('hidden');
                     document.getElementById('mGhost').classList.add('hidden');
                     document.getElementById('hudKick').classList.add('hidden');
-                    // Reset Timer
-                    document.getElementById('gameTimer').innerText = "04:00";
+                    // Reset Timer UI
+                    document.getElementById('gameTimer').innerText = "06:00";
                     document.getElementById('gameTimer').classList.remove('danger');
                     break;
                 case 'bombs_update': bombs = data.bombs; break;
@@ -355,7 +354,7 @@
                     const secs = (t % 60).toString().padStart(2, '0');
                     const timerEl = document.getElementById('gameTimer');
                     timerEl.innerText = `${mins}:${secs}`;
-                    if(t <= 60) timerEl.classList.add('danger');
+                    if(t <= 90) timerEl.classList.add('danger'); // 90s chaos
                     else timerEl.classList.remove('danger');
                     break;
             }
