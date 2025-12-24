@@ -16,13 +16,8 @@
         }
         
         #mainContainer {
-            display: flex;
-            align-items: center; /* Alineación vertical centrada de los hijos */
-            justify-content: center;
-            gap: 20px;
-            /* Importante: permite que el contenedor se encoja si es necesario */
-            max-height: 100vh; 
-            max-width: 100vw;
+            display: flex; align-items: center; justify-content: center;
+            gap: 20px; max-height: 100vh; max-width: 100vw;
         }
 
         #gameWrapper {
@@ -30,37 +25,20 @@
             box-shadow: 0 0 60px rgba(0, 0, 0, 0.9);
             border-radius: 12px; overflow: hidden;
             background: #111; border: 4px solid #334155;
-            transition: transform 0.3s ease; /* Suavizar redimensionado */
-            /* Flex-shrink evita que el navegador calcule mal el tamaño antes del scale */
-            flex-shrink: 0; 
+            transition: transform 0.3s ease; flex-shrink: 0; 
         }
 
         #sideHud {
-            width: 260px;
-            background: rgba(15, 23, 42, 0.95);
-            border: 2px solid #475569;
-            border-radius: 12px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            box-shadow: 0 0 25px rgba(0,0,0,0.6);
-            /* Asegurar que el HUD no se rompa al redimensionar */
-            flex-shrink: 0; 
-            max-height: 90vh;
-            overflow-y: auto;
+            width: 260px; background: rgba(15, 23, 42, 0.95);
+            border: 2px solid #475569; border-radius: 12px;
+            padding: 20px; display: flex; flex-direction: column;
+            gap: 15px; box-shadow: 0 0 25px rgba(0,0,0,0.6);
+            flex-shrink: 0; max-height: 90vh; overflow-y: auto;
         }
 
-        /* CONTROLES MÓVILES */
         #mobileControls {
-            display: none;
-            position: fixed;
-            bottom: 20px;
-            left: 0;
-            width: 100%;
-            height: 180px;
-            z-index: 100;
-            pointer-events: none; 
+            display: none; position: fixed; bottom: 20px; left: 0;
+            width: 100%; height: 180px; z-index: 100; pointer-events: none; 
         }
 
         @media (max-width: 1024px) {
@@ -72,12 +50,9 @@
 
         .dpad { position: relative; width: 160px; height: 160px; pointer-events: auto; }
         .d-btn {
-            position: absolute;
-            background: rgba(255, 255, 255, 0.15);
-            border: 2px solid rgba(255,255,255,0.3);
-            border-radius: 10px;
-            width: 50px; height: 50px;
-            backdrop-filter: blur(4px);
+            position: absolute; background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255,255,255,0.3); border-radius: 10px;
+            width: 50px; height: 50px; backdrop-filter: blur(4px);
         }
         .d-btn:active { background: rgba(250, 204, 21, 0.5); border-color: #facc15; }
         .d-up { top: 0; left: 55px; } .d-down { bottom: 0; left: 55px; }
@@ -86,8 +61,7 @@
         .action-btn {
             pointer-events: auto; width: 90px; height: 90px;
             border-radius: 50%; background: rgba(239, 68, 68, 0.3);
-            border: 4px solid rgba(239, 68, 68, 0.6);
-            backdrop-filter: blur(4px);
+            border: 4px solid rgba(239, 68, 68, 0.6); backdrop-filter: blur(4px);
             display: flex; align-items: center; justify-content: center;
             font-size: 2rem; margin-top: 30px;
         }
@@ -148,6 +122,19 @@
             background: rgba(0,0,0,0.6); padding: 5px 15px;
             border-radius: 20px; gap: 15px; pointer-events: none; z-index: 5;
         }
+
+        /* --- NUEVO: Estilos del Timer --- */
+        #gameTimer {
+            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.8); padding: 5px 20px; border-radius: 20px;
+            border: 2px solid #334155; font-size: 1.5rem; font-weight: 900;
+            color: white; z-index: 10; font-family: monospace;
+        }
+        #gameTimer.danger {
+            border-color: #ef4444; color: #ef4444;
+            animation: pulse-red 1s infinite;
+        }
+        @keyframes pulse-red { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -155,7 +142,9 @@
     <div id="mainContainer">
         <div id="gameWrapper">
             <div id="roomCodeTag" class="room-code-display hidden">SALA: <span id="currentRoomCode">----</span></div>
-            
+            <!-- TIMER DISPLAY -->
+            <div id="gameTimer" class="hidden">04:00</div>
+
             <div id="mobileHud">
                 <span class="text-red-400 font-bold">🔥 <span id="mRange">1</span></span>
                 <span class="text-blue-400 font-bold">💣 <span id="mBombs">1</span></span>
@@ -265,38 +254,24 @@
             socket.onerror = () => alert("Error conectando al servidor.");
         }
 
-        // --- FIXED RESIZE FUNCTION ---
         function resizeCanvas(size) {
             gridSize = size;
             canvas.width = size * TILE;
             canvas.height = size * TILE;
             
             const wrapper = document.getElementById('gameWrapper');
-            // Detectar si es móvil (ancho < 1024) para restar menos espacio
             const isMobile = window.innerWidth < 1024;
-            
-            // Calculamos espacio disponible
-            // En PC: restamos 300px del HUD lateral y 40px de márgenes
-            // En Móvil: restamos solo 20px de márgenes laterales y 40px verticales
             const availableWidth = window.innerWidth - (isMobile ? 20 : 300); 
             const availableHeight = window.innerHeight - 40;
-            
-            // Calculamos la escala manteniendo la proporción
             const scale = Math.min(availableHeight / canvas.height, availableWidth / canvas.width);
             
             wrapper.style.width = canvas.width + "px";
             wrapper.style.height = canvas.height + "px";
-            
-            // Aplicamos escala
-            // IMPORTANTE: transformOrigin siempre en 'center center' para evitar recortes al centrar con flexbox
             wrapper.style.transform = `scale(${Math.min(scale, 1)})`; 
             wrapper.style.transformOrigin = "center center"; 
         }
         
-        // Listener para redimensionar si cambia el tamaño de ventana
-        window.addEventListener('resize', () => {
-             if(gridSize) resizeCanvas(gridSize);
-        });
+        window.addEventListener('resize', () => { if(gridSize) resizeCanvas(gridSize); });
 
         function handleMsg(data) {
             switch(data.type) {
@@ -326,6 +301,9 @@
                     document.getElementById('hudGhost').classList.add('hidden');
                     document.getElementById('mGhost').classList.add('hidden');
                     document.getElementById('hudKick').classList.add('hidden');
+                    // Reset Timer
+                    document.getElementById('gameTimer').innerText = "04:00";
+                    document.getElementById('gameTimer').classList.remove('danger');
                     break;
                 case 'bombs_update': bombs = data.bombs; break;
                 case 'player_joined': players[data.player.id] = data.player; updateLobby(); break;
@@ -370,6 +348,16 @@
                     if(data.id === myId && data.kind === 'GHOST') { players[myId].ghost = false; stopGhostTimer(); }
                     break;
                 case 'game_over': showMsg(data.winner_id === myId ? "¡VICTORIA!" : "FIN DE RONDA", `Ganador: ${data.winner_name || 'Nadie'}`, true); break;
+                // NUEVO: ACTUALIZACIÓN DE TIMER
+                case 'timer_update':
+                    const t = data.time;
+                    const mins = Math.floor(t / 60).toString().padStart(2, '0');
+                    const secs = (t % 60).toString().padStart(2, '0');
+                    const timerEl = document.getElementById('gameTimer');
+                    timerEl.innerText = `${mins}:${secs}`;
+                    if(t <= 60) timerEl.classList.add('danger');
+                    else timerEl.classList.remove('danger');
+                    break;
             }
         }
 
@@ -390,7 +378,6 @@
             let timeLeft = 15;
             document.getElementById('hudGhostTimer').innerText = timeLeft;
             document.getElementById('ghostTimer').innerText = timeLeft;
-            
             if(ghostInterval) clearInterval(ghostInterval);
             ghostInterval = setInterval(() => {
                 timeLeft--;
@@ -426,6 +413,7 @@
             gameRunning = true; 
             toggleMenu(null); 
             document.getElementById('sideHud').classList.remove('hidden'); 
+            document.getElementById('gameTimer').classList.remove('hidden');
             requestAnimationFrame(gameLoop); 
         }
         function showMsg(t, s, isWin) { 
@@ -469,76 +457,62 @@
         function handleInput() {
             if(!gameRunning || !players[myId]?.alive) return;
             const p = players[myId];
-            
-            let dx = 0, dy = 0;
-            if(keys['w'] || keys['ArrowUp']) dy = -localSpeed;
-            if(keys['s'] || keys['ArrowDown']) dy = localSpeed;
-            if(keys['a'] || keys['ArrowLeft']) dx = -localSpeed;
-            if(keys['d'] || keys['ArrowRight']) dx = localSpeed;
-            if(dx === 0 && dy === 0) return;
+            let dx = 0, dy = 0, inputDx = 0, inputDy = 0;
 
-            const size = 40; 
-            const offset = (TILE - size) / 2; 
+            if(keys['w'] || keys['ArrowUp']) { dy = -localSpeed; inputDy = -1; }
+            if(keys['s'] || keys['ArrowDown']) { dy = localSpeed; inputDy = 1; }
+            if(keys['a'] || keys['ArrowLeft']) { dx = -localSpeed; inputDx = -1; }
+            if(keys['d'] || keys['ArrowRight']) { dx = localSpeed; inputDx = 1; }
+            
+            const now = Date.now();
+            if(now - lastSend > 30) { 
+                socket.send(JSON.stringify({ type: 'move', x: p.x, y: p.y, dx: inputDx, dy: inputDy })); 
+                lastSend = now; 
+            }
+
+            if(dx === 0 && dy === 0) return;
+            const size = 40, offset = (TILE - size) / 2; 
 
             if(dx !== 0) {
-                if(!checkRectCollision(p.x + dx + offset, p.y + offset, size, size, p.ghost, p.x + offset, p.y + offset)) {
-                    p.x += dx;
-                } else {
-                    const gridY = Math.round(p.y / TILE) * TILE;
-                    const diff = p.y - gridY;
+                if(!checkRectCollision(p.x + dx + offset, p.y + offset, size, size, p.ghost, p.x + offset, p.y + offset)) p.x += dx;
+                else {
+                    const gridY = Math.round(p.y / TILE) * TILE, diff = p.y - gridY;
                     if(Math.abs(diff) > 4 && Math.abs(diff) < 24) { 
                         const slideDir = diff > 0 ? -1 : 1; 
-                         if(!checkRectCollision(p.x + offset, p.y + (slideDir*localSpeed) + offset, size, size, p.ghost, p.x + offset, p.y + offset)) {
-                             p.y += slideDir * (localSpeed * 0.7); 
-                         }
+                         if(!checkRectCollision(p.x + offset, p.y + (slideDir*localSpeed) + offset, size, size, p.ghost, p.x + offset, p.y + offset)) p.y += slideDir * (localSpeed * 0.7); 
                     }
                 }
             }
-
             if(dy !== 0) {
-                if(!checkRectCollision(p.x + offset, p.y + dy + offset, size, size, p.ghost, p.x + offset, p.y + offset)) {
-                    p.y += dy;
-                } else {
-                    const gridX = Math.round(p.x / TILE) * TILE;
-                    const diff = p.x - gridX;
+                if(!checkRectCollision(p.x + offset, p.y + dy + offset, size, size, p.ghost, p.x + offset, p.y + offset)) p.y += dy;
+                else {
+                    const gridX = Math.round(p.x / TILE) * TILE, diff = p.x - gridX;
                     if(Math.abs(diff) > 4 && Math.abs(diff) < 24) {
                         const slideDir = diff > 0 ? -1 : 1;
-                        if(!checkRectCollision(p.x + (slideDir*localSpeed) + offset, p.y + offset, size, size, p.ghost, p.x + offset, p.y + offset)) {
-                            p.x += slideDir * (localSpeed * 0.7);
-                        }
+                        if(!checkRectCollision(p.x + (slideDir*localSpeed) + offset, p.y + offset, size, size, p.ghost, p.x + offset, p.y + offset)) p.x += slideDir * (localSpeed * 0.7);
                     }
                 }
             }
-            
             p.x = Math.max(0, Math.min(p.x, canvas.width - TILE));
             p.y = Math.max(0, Math.min(p.y, canvas.height - TILE));
-
-            const now = Date.now();
-            if(now - lastSend > 30) { socket.send(JSON.stringify({ type: 'move', x: p.x, y: p.y })); lastSend = now; }
         }
 
         function checkRectCollision(targetX, targetY, w, h, ghost, curX, curY) {
-            const left = Math.floor(targetX / TILE);
-            const right = Math.floor((targetX + w - 0.1) / TILE);
-            const top = Math.floor(targetY / TILE);
-            const bottom = Math.floor((targetY + h - 0.1) / TILE);
+            const left = Math.floor(targetX / TILE), right = Math.floor((targetX + w - 0.1) / TILE);
+            const top = Math.floor(targetY / TILE), bottom = Math.floor((targetY + h - 0.1) / TILE);
             const playerLeft = curX, playerRight = curX + w, playerTop = curY, playerBottom = curY + h;
-
             for(let gy = top; gy <= bottom; gy++) {
                 for(let gx = left; gx <= right; gx++) {
                     if(gy < 0 || gy >= gridSize || gx < 0 || gx >= gridSize) return true;
                     const cell = map[gy][gx];
                     if(cell === 1) return true; 
                     if(cell === 2 && !ghost) return true; 
-
                     if(!ghost) {
                         for (let b of bombs) {
-                            const bx = Math.round(b.x / TILE);
-                            const by = Math.round(b.y / TILE);
+                            const bx = Math.round(b.x / TILE), by = Math.round(b.y / TILE);
                             if (bx === gx && by === gy) {
                                 const bombLeft = bx * TILE, bombRight = bombLeft + TILE, bombTop = by * TILE, bombBottom = bombTop + TILE;
-                                const isCurrentlyOverlapping = playerLeft < bombRight && playerRight > bombLeft && playerTop < bombBottom && playerBottom > bombTop;
-                                if (isCurrentlyOverlapping) continue; 
+                                if (playerLeft < bombRight && playerRight > bombLeft && playerTop < bombBottom && playerBottom > bombTop) continue; 
                                 return true; 
                             }
                         }
@@ -559,27 +533,12 @@
         function gameLoop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             handleInput();
-            for(let id in playerTargets) {
-                if(players[id]) {
-                    players[id].x += (playerTargets[id].x - players[id].x) * 0.25;
-                    players[id].y += (playerTargets[id].y - players[id].y) * 0.25;
-                }
-            }
-            for(let y=0; y<gridSize; y++) {
-                for(let x=0; x<gridSize; x++) {
-                    ctx.fillStyle = (x+y)%2 === 0 ? COLORS.FLOOR_1 : COLORS.FLOOR_2;
-                    ctx.fillRect(x*TILE, y*TILE, TILE, TILE);
-                }
-            }
-            for(let y=0; y<gridSize; y++) {
-                for(let x=0; x<gridSize; x++) {
-                    const t = map[y][x];
-                    if(t === 0) continue;
-                    const px = x*TILE, py = y*TILE;
-                    if(t === 1) drawHardWall(px, py);
-                    else if(t === 2) drawSoftWall(px, py, players[myId]?.ghost);
-                    else if(t >= 3) drawItem(px, py, t);
-                }
+            for(let id in playerTargets) { if(players[id]) { players[id].x += (playerTargets[id].x - players[id].x) * 0.25; players[id].y += (playerTargets[id].y - players[id].y) * 0.25; } }
+            for(let y=0; y<gridSize; y++) for(let x=0; x<gridSize; x++) { ctx.fillStyle = (x+y)%2 === 0 ? COLORS.FLOOR_1 : COLORS.FLOOR_2; ctx.fillRect(x*TILE, y*TILE, TILE, TILE); }
+            for(let y=0; y<gridSize; y++) for(let x=0; x<gridSize; x++) {
+                const t = map[y][x]; if(t === 0) continue;
+                const px = x*TILE, py = y*TILE;
+                if(t === 1) drawHardWall(px, py); else if(t === 2) drawSoftWall(px, py, players[myId]?.ghost); else if(t >= 3) drawItem(px, py, t);
             }
             const time = Date.now();
             bombs.forEach(b => drawBomb(b.x + TILE/2, b.y + TILE/2, time));
@@ -591,78 +550,53 @@
         function drawHardWall(x, y) {
             ctx.fillStyle = COLORS.WALL_HARD_SIDE; ctx.fillRect(x, y+12, TILE, TILE-12);
             ctx.fillStyle = COLORS.WALL_HARD_TOP; ctx.fillRect(x, y, TILE, TILE-12);
-            ctx.fillStyle = '#1e293b';
-            [[8,8],[56,8],[8,44],[56,44]].forEach(p=> {ctx.beginPath();ctx.arc(x+p[0],y+p[1],3,0,7);ctx.fill()});
+            ctx.fillStyle = '#1e293b'; [[8,8],[56,8],[8,44],[56,44]].forEach(p=> {ctx.beginPath();ctx.arc(x+p[0],y+p[1],3,0,7);ctx.fill()});
             ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(x+10, y+20, 44, 24);
         }
         function drawSoftWall(x, y, isGhost) {
             ctx.globalAlpha = isGhost ? 0.6 : 1.0;
             ctx.fillStyle = COLORS.WALL_SOFT_SIDE; ctx.fillRect(x, y+10, TILE, TILE-10);
             ctx.fillStyle = COLORS.WALL_SOFT_TOP; ctx.fillRect(x, y, TILE, TILE-10);
-            ctx.fillStyle = 'rgba(50, 20, 0, 0.3)';
-            ctx.fillRect(x, y+15, TILE, 4); ctx.fillRect(x, y+35, TILE, 4);
+            ctx.fillStyle = 'rgba(50, 20, 0, 0.3)'; ctx.fillRect(x, y+15, TILE, 4); ctx.fillRect(x, y+35, TILE, 4);
             ctx.fillRect(x+32, y, 4, 15); ctx.fillRect(x+15, y+15, 4, 20); ctx.fillRect(x+45, y+15, 4, 20);
             ctx.globalAlpha = 1.0;
         }
         function drawBomb(x, y, time) {
-            const pulse = Math.sin(time * 0.015) * 0.1 + 1;
-            ctx.translate(x, y); ctx.scale(pulse, pulse);
-            const grad = ctx.createRadialGradient(-5, -5, 2, 0, 0, 22);
-            grad.addColorStop(0, '#555'); grad.addColorStop(1, '#111');
+            const pulse = Math.sin(time * 0.015) * 0.1 + 1; ctx.translate(x, y); ctx.scale(pulse, pulse);
+            const grad = ctx.createRadialGradient(-5, -5, 2, 0, 0, 22); grad.addColorStop(0, '#555'); grad.addColorStop(1, '#111');
             ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 0, 22, 0, 7); ctx.fill();
             ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.beginPath(); ctx.arc(-8, -8, 6, 0, 7); ctx.fill();
             ctx.fillStyle = (time % 200 < 100) ? '#ff4500' : '#ffcc00'; ctx.beginPath(); ctx.arc(0, -22, 4, 0, 7); ctx.fill();
             ctx.setTransform(1,0,0,1,0,0);
         }
         function drawCharacter(p, x, y, time) {
-            const walk = Math.sin(time * 0.02);
-            const moving = Math.abs(p.x-(p._lx||p.x))>0.1 || Math.abs(p.y-(p._ly||p.y))>0.1;
-            p._lx=p.x; p._ly=p.y;
-            const off = moving ? walk*6 : 0;
-            const bob = moving ? Math.abs(walk)*2 : 0;
-            ctx.translate(x, y);
-            if(p.ghost) { ctx.shadowBlur=15; ctx.shadowColor=p.color; ctx.globalAlpha=0.8; }
+            const walk = Math.sin(time * 0.02); const moving = Math.abs(p.x-(p._lx||p.x))>0.1 || Math.abs(p.y-(p._ly||p.y))>0.1; p._lx=p.x; p._ly=p.y;
+            const off = moving ? walk*6 : 0; const bob = moving ? Math.abs(walk)*2 : 0;
+            ctx.translate(x, y); if(p.ghost) { ctx.shadowBlur=15; ctx.shadowColor=p.color; ctx.globalAlpha=0.8; }
             ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(0, 20, 14, 5, 0, 0, 7); ctx.fill(); 
-            ctx.fillStyle = p.color;
-            ctx.beginPath(); ctx.arc(-8, 18+off, 6, 0, 7); ctx.fill(); 
-            ctx.beginPath(); ctx.arc(8, 18-off, 6, 0, 7); ctx.fill(); 
-            ctx.translate(0, -bob);
-            ctx.fillStyle = p.color; 
-            drawRoundRect(ctx, -10, 5, 20, 14, 4); 
+            ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(-8, 18+off, 6, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(8, 18-off, 6, 0, 7); ctx.fill(); 
+            ctx.translate(0, -bob); ctx.fillStyle = p.color; drawRoundRect(ctx, -10, 5, 20, 14, 4); 
             ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(-6, 8, 12, 6); 
             ctx.beginPath(); ctx.arc(0, -6, 15, 0, 7); ctx.fill(); 
             const vg = ctx.createLinearGradient(-10, -10, 10, 0); vg.addColorStop(0,'#111'); vg.addColorStop(0.5,'#fbcfe8'); vg.addColorStop(1,'#111');
-            ctx.fillStyle = vg; 
-            drawRoundRect(ctx, -10, -12, 20, 10, 4);
+            ctx.fillStyle = vg; drawRoundRect(ctx, -10, -12, 20, 10, 4);
             ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(0, -22, 3, 0, 7); ctx.fill(); 
-            ctx.fillStyle = 'white'; 
-            ctx.beginPath(); ctx.arc(-14, 6-off, 5, 0, 7); ctx.fill(); 
-            ctx.beginPath(); ctx.arc(14, 6+off, 5, 0, 7); ctx.fill(); 
+            ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(-14, 6-off, 5, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(14, 6+off, 5, 0, 7); ctx.fill(); 
             ctx.setTransform(1,0,0,1,0,0);
-            ctx.fillStyle = "white"; ctx.font = "bold 11px Orbitron"; ctx.textAlign = "center";
-            ctx.shadowColor="black"; ctx.shadowBlur=4; ctx.fillText(p.nickname, x, y - 35); ctx.shadowBlur=0;
+            ctx.fillStyle = "white"; ctx.font = "bold 11px Orbitron"; ctx.textAlign = "center"; ctx.shadowColor="black"; ctx.shadowBlur=4; ctx.fillText(p.nickname, x, y - 35); ctx.shadowBlur=0;
         }
         function drawItem(x, y, t) {
-            const icons = {3:'🔥', 4:'⚡', 5:'👻', 6:'👟', 7:'💣'};
-            const colors = {3:'#ef4444', 4:'#3b82f6', 5:'#a855f7', 6:'#22c55e', 7:'#3b82f6'};
-            const bounce = Math.sin(Date.now()*0.005)*3;
-            ctx.shadowBlur = 15; ctx.shadowColor = colors[t];
-            ctx.fillStyle = colors[t];
-            ctx.beginPath(); ctx.arc(x+32, y+32+bounce, 18, 0, 7); ctx.fill();
-            ctx.fillStyle = 'white'; ctx.textAlign='center'; ctx.font='22px Arial';
-            ctx.fillText(icons[t], x+32, y+39+bounce);
-            ctx.shadowBlur = 0;
+            const icons = {3:'🔥', 4:'⚡', 5:'👻', 6:'👟', 7:'💣'}; const colors = {3:'#ef4444', 4:'#3b82f6', 5:'#a855f7', 6:'#22c55e', 7:'#3b82f6'};
+            const bounce = Math.sin(Date.now()*0.005)*3; ctx.shadowBlur = 15; ctx.shadowColor = colors[t];
+            ctx.fillStyle = colors[t]; ctx.beginPath(); ctx.arc(x+32, y+32+bounce, 18, 0, 7); ctx.fill();
+            ctx.fillStyle = 'white'; ctx.textAlign='center'; ctx.font='22px Arial'; ctx.fillText(icons[t], x+32, y+39+bounce); ctx.shadowBlur = 0;
         }
         function spawnExplosion(x, y) { for(let i=0; i<25; i++) particles.push({ x, y, vx:(Math.random()-0.5)*14, vy:(Math.random()-0.5)*14, l:1, c:`hsl(${Math.random()*40+10},100%,50%)`, s:Math.random()*25+5 }); }
         function spawnDebris(x, y) { for(let i=0; i<10; i++) particles.push({ x, y, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, l:0.8, c:'#92400e', s:Math.random()*8+2 }); }
         function spawnDeath(x, y, c) { for(let i=0; i<40; i++) particles.push({ x, y, vx:(Math.random()-0.5)*18, vy:(Math.random()-0.5)*18, l:1.5, c:c, s:Math.random()*10+4 }); }
         function updateParticles() {
             particles = particles.filter(p => p.l > 0);
-            particles.forEach(p => {
-                p.x += p.vx; p.y += p.vy; p.l -= 0.04; p.s *= 0.92;
-                ctx.globalAlpha = p.l; ctx.fillStyle = p.c;
-                ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, 7); ctx.fill();
-            });
+            particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.l -= 0.04; p.s *= 0.92; ctx.globalAlpha = p.l; ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, 7); ctx.fill(); });
             ctx.globalAlpha = 1.0;
         }
     </script>
