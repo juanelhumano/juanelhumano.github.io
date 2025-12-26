@@ -12,7 +12,7 @@
             color: white; font-family: 'Orbitron', sans-serif;
             overflow: hidden; height: 100vh; width: 100vw;
             display: flex; align-items: center; justify-content: center;
-            touch-action: none; /* Previene zoom y scroll en móviles */
+            touch-action: none; 
         }
         
         #mainContainer {
@@ -26,7 +26,6 @@
             border-radius: 12px; overflow: hidden;
             background: #111; border: 4px solid #334155;
             transition: transform 0.3s ease; flex-shrink: 0; 
-            /* Centrado absoluto para evitar desbordes */
             transform-origin: center center;
         }
 
@@ -38,51 +37,57 @@
             flex-shrink: 0; max-height: 90vh; overflow-y: auto;
         }
 
-        /* --- CONTROLES MÓVILES MEJORADOS --- */
+        /* --- CONTROLES MÓVILES --- */
         #mobileControls {
             display: none; 
             position: fixed; 
             top: 0; left: 0; width: 100%; height: 100%; 
             z-index: 100; pointer-events: none;
-            padding: 20px;
-            /* Respetar safe areas (notch) */
+            /* Respetar safe areas */
             padding-left: env(safe-area-inset-left);
             padding-right: env(safe-area-inset-right);
             padding-bottom: env(safe-area-inset-bottom);
         }
 
-        /* MODO VERTICAL (PORTRAIT) */
+        /* MODO VERTICAL (PORTRAIT) - Controles abajo */
         @media (max-width: 1024px) and (orientation: portrait) {
             #mobileControls { 
                 display: flex; 
                 flex-direction: row;
                 align-items: flex-end; 
                 justify-content: space-between;
-                padding-bottom: 40px;
+                padding: 20px 40px 40px 40px;
             }
             #sideHud { display: none !important; } 
             #mainContainer { gap: 0; }
             #mobileHud { display: flex !important; }
-            .dpad { margin-left: 10px; }
-            .action-btn { margin-right: 10px; margin-bottom: 10px; }
+            .dpad { margin-left: 0; }
+            .action-btn { margin-right: 0; margin-bottom: 10px; }
         }
 
-        /* MODO HORIZONTAL (LANDSCAPE) */
+        /* MODO HORIZONTAL (LANDSCAPE) - Controles en los "pilares" laterales */
         @media (max-width: 1024px) and (orientation: landscape) {
             #mobileControls { 
                 display: flex; 
                 flex-direction: row;
-                align-items: flex-end; /* Alineados abajo */
-                justify-content: space-between; /* Separados a los extremos */
-                padding-bottom: 20px;
+                align-items: center; /* CENTRADO VERTICALMENTE */
+                justify-content: space-between; /* A LOS EXTREMOS */
+                padding: 0 40px; /* Margen seguro lateral */
             }
             #sideHud { display: none !important; } 
             #mainContainer { gap: 0; }
             #mobileHud { display: flex !important; }
             
-            /* Ajustes específicos para que no estorben la visión */
-            .dpad { margin-left: 30px; margin-bottom: 10px; transform: scale(0.9); }
-            .action-btn { margin-right: 30px; margin-bottom: 20px; transform: scale(0.9); }
+            /* Ajustes para que queden bien centrados en sus áreas */
+            .dpad { 
+                pointer-events: auto;
+                transform: scale(1.1); /* Un poco más grandes para comodidad */
+            }
+            .action-btn { 
+                pointer-events: auto;
+                transform: scale(1.1);
+                margin-bottom: 0; /* Sin margen inferior, centrado puro */
+            }
         }
 
         .dpad { position: relative; width: 160px; height: 160px; pointer-events: auto; }
@@ -326,7 +331,7 @@
             socket.onerror = () => alert("Error conectando al servidor.");
         }
 
-        // --- RESIZE CANVAS CORREGIDO PARA LANDSCAPE ---
+        // --- RESIZE CANVAS AJUSTADO PARA DEJAR PILARES LATERALES ---
         function resizeCanvas(size) {
             gridSize = size;
             canvas.width = size * TILE;
@@ -336,14 +341,15 @@
             const isMobile = window.innerWidth < 1024;
             const isLandscape = window.innerWidth > window.innerHeight && isMobile;
             
-            // En móvil landscape, dejamos más margen para los controles
-            const marginH = isLandscape ? 120 : (isMobile ? 20 : 300);
+            // En modo Landscape, reservamos 300px totales (150px a cada lado) para los controles
+            // Esto forzará al juego a encogerse y dejar espacio vacío.
+            const marginH = isLandscape ? 300 : (isMobile ? 20 : 300);
             const marginV = isMobile ? 20 : 40;
 
             const availableWidth = window.innerWidth - marginH; 
             const availableHeight = window.innerHeight - marginV;
 
-            // En landscape priorizamos que quepa la altura
+            // Calculamos la escala con el espacio reducido
             const scale = Math.min(availableHeight / canvas.height, availableWidth / canvas.width);
             
             wrapper.style.width = canvas.width + "px";
@@ -353,7 +359,6 @@
         }
         
         window.addEventListener('resize', () => { if(gridSize) resizeCanvas(gridSize); });
-        // También escuchamos el cambio de orientación
         window.addEventListener('orientationchange', () => { setTimeout(() => { if(gridSize) resizeCanvas(gridSize); }, 200); });
 
         function handleMsg(data) {
