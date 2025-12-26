@@ -140,11 +140,12 @@
     <!-- AUDIO PRELOAD -->
     <audio id="bgmBattle" src="10 Battle.mp3" loop></audio>
     <audio id="bgmWin" src="12 Congratulations!.mp3"></audio>
+    <!-- NUEVO: Efecto de sonido de explosión -->
+    <audio id="sfxExplode" src="8 Explosion.mp3" preload="auto"></audio>
 
     <div id="mainContainer">
         <div id="gameWrapper">
             <div id="roomCodeTag" class="room-code-display hidden">SALA: <span id="currentRoomCode">----</span></div>
-            <!-- Timer starts at 4 mins -->
             <div id="gameTimer" class="hidden">04:00</div>
 
             <div id="mobileHud">
@@ -242,8 +243,11 @@
         // --- AUDIO MANAGEMENT ---
         const bgmBattle = document.getElementById('bgmBattle');
         const bgmWin = document.getElementById('bgmWin');
-        bgmBattle.volume = 0.4; // Ajustar volumen si es necesario
+        const sfxExplode = document.getElementById('sfxExplode'); // Referencia al SFX
+
+        bgmBattle.volume = 0.4;
         bgmWin.volume = 0.5;
+        sfxExplode.volume = 0.6; // Volumen de la explosión
 
         function playMusic(type) {
             try {
@@ -256,6 +260,16 @@
                 } else if (type === 'STOP') {
                     bgmBattle.pause(); bgmWin.pause();
                 }
+            } catch(e) { console.error(e); }
+        }
+
+        // Función para reproducir explosiones superpuestas
+        function playExplosionSound() {
+            try {
+                // Clonamos el nodo para permitir polifonía (varias bombas a la vez)
+                const sound = sfxExplode.cloneNode();
+                sound.volume = 0.6;
+                sound.play().catch(e => console.log("Audio block:", e));
             } catch(e) { console.error(e); }
         }
 
@@ -329,7 +343,7 @@
                     document.getElementById('hudKick').classList.add('hidden');
                     document.getElementById('gameTimer').innerText = "04:00";
                     document.getElementById('gameTimer').classList.remove('danger');
-                    playMusic('STOP'); // Detener música al volver al lobby
+                    playMusic('STOP'); 
                     break;
                 case 'bombs_update': bombs = data.bombs; break;
                 case 'player_joined': players[data.player.id] = data.player; updateLobby(); break;
@@ -348,7 +362,10 @@
                         }
                     }
                     break;
-                case 'explosion': data.cells.forEach(c => spawnExplosion(c.x+32, c.y+32)); break;
+                case 'explosion': 
+                    data.cells.forEach(c => spawnExplosion(c.x+32, c.y+32)); 
+                    playExplosionSound(); // REPRODUCIR SONIDO
+                    break;
                 case 'map_update': 
                     map[data.y][data.x] = data.val; 
                     spawnDebris(data.x*TILE+32, data.y*TILE+32); 
@@ -375,7 +392,7 @@
                     break;
                 case 'game_over': 
                     showMsg(data.winner_id === myId ? "¡VICTORIA!" : "FIN DE RONDA", `Ganador: ${data.winner_name || 'Nadie'}`, true);
-                    playMusic('WIN'); // Sonido de victoria
+                    playMusic('WIN'); 
                     
                     document.getElementById('gameOverButtons').classList.remove('hidden');
                     document.getElementById('errorBtn').classList.add('hidden');
@@ -392,7 +409,7 @@
                     const secs = (t % 60).toString().padStart(2, '0');
                     const timerEl = document.getElementById('gameTimer');
                     timerEl.innerText = `${mins}:${secs}`;
-                    if(t <= 60) timerEl.classList.add('danger'); // Caos en último minuto (60s)
+                    if(t <= 60) timerEl.classList.add('danger');
                     else timerEl.classList.remove('danger');
                     break;
             }
