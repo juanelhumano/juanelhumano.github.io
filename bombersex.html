@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Bomberman Online: Battle Rooms</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
@@ -12,12 +12,12 @@
             color: white; font-family: 'Orbitron', sans-serif;
             overflow: hidden; height: 100vh; width: 100vw;
             display: flex; align-items: center; justify-content: center;
-            touch-action: none; 
+            touch-action: none; /* Previene zoom y scroll en móviles */
         }
         
         #mainContainer {
             display: flex; align-items: center; justify-content: center;
-            gap: 20px; max-height: 100vh; max-width: 100vw;
+            gap: 20px; width: 100%; height: 100%;
         }
 
         #gameWrapper {
@@ -26,6 +26,8 @@
             border-radius: 12px; overflow: hidden;
             background: #111; border: 4px solid #334155;
             transition: transform 0.3s ease; flex-shrink: 0; 
+            /* Centrado absoluto para evitar desbordes */
+            transform-origin: center center;
         }
 
         #sideHud {
@@ -36,16 +38,51 @@
             flex-shrink: 0; max-height: 90vh; overflow-y: auto;
         }
 
+        /* --- CONTROLES MÓVILES MEJORADOS --- */
         #mobileControls {
-            display: none; position: fixed; bottom: 20px; left: 0;
-            width: 100%; height: 180px; z-index: 100; pointer-events: none; 
+            display: none; 
+            position: fixed; 
+            top: 0; left: 0; width: 100%; height: 100%; 
+            z-index: 100; pointer-events: none;
+            padding: 20px;
+            /* Respetar safe areas (notch) */
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+            padding-bottom: env(safe-area-inset-bottom);
         }
 
-        @media (max-width: 1024px) {
-            #mobileControls { display: flex; justify-content: space-between; padding: 0 40px; }
+        /* MODO VERTICAL (PORTRAIT) */
+        @media (max-width: 1024px) and (orientation: portrait) {
+            #mobileControls { 
+                display: flex; 
+                flex-direction: row;
+                align-items: flex-end; 
+                justify-content: space-between;
+                padding-bottom: 40px;
+            }
             #sideHud { display: none !important; } 
             #mainContainer { gap: 0; }
             #mobileHud { display: flex !important; }
+            .dpad { margin-left: 10px; }
+            .action-btn { margin-right: 10px; margin-bottom: 10px; }
+        }
+
+        /* MODO HORIZONTAL (LANDSCAPE) */
+        @media (max-width: 1024px) and (orientation: landscape) {
+            #mobileControls { 
+                display: flex; 
+                flex-direction: row;
+                align-items: flex-end; /* Alineados abajo */
+                justify-content: space-between; /* Separados a los extremos */
+                padding-bottom: 20px;
+            }
+            #sideHud { display: none !important; } 
+            #mainContainer { gap: 0; }
+            #mobileHud { display: flex !important; }
+            
+            /* Ajustes específicos para que no estorben la visión */
+            .dpad { margin-left: 30px; margin-bottom: 10px; transform: scale(0.9); }
+            .action-btn { margin-right: 30px; margin-bottom: 20px; transform: scale(0.9); }
         }
 
         .dpad { position: relative; width: 160px; height: 160px; pointer-events: auto; }
@@ -63,7 +100,7 @@
             border-radius: 50%; background: rgba(239, 68, 68, 0.3);
             border: 4px solid rgba(239, 68, 68, 0.6); backdrop-filter: blur(4px);
             display: flex; align-items: center; justify-content: center;
-            font-size: 2rem; margin-top: 30px;
+            font-size: 2rem;
         }
         .action-btn:active { background: rgba(239, 68, 68, 0.8); transform: scale(0.95); }
 
@@ -137,10 +174,8 @@
     </style>
 </head>
 <body>
-    <!-- AUDIO PRELOAD -->
     <audio id="bgmBattle" src="10 Battle.mp3" loop></audio>
     <audio id="bgmWin" src="12 Congratulations!.mp3"></audio>
-    <!-- NUEVO: Efecto de sonido de explosión -->
     <audio id="sfxExplode" src="8 Explosion.mp3" preload="auto"></audio>
 
     <div id="mainContainer">
@@ -240,14 +275,13 @@
             WALL_SOFT_SIDE: '#92400e', WALL_SOFT_TOP: '#b45309'
         };
 
-        // --- AUDIO MANAGEMENT ---
         const bgmBattle = document.getElementById('bgmBattle');
         const bgmWin = document.getElementById('bgmWin');
-        const sfxExplode = document.getElementById('sfxExplode'); // Referencia al SFX
+        const sfxExplode = document.getElementById('sfxExplode');
 
         bgmBattle.volume = 0.4;
         bgmWin.volume = 0.5;
-        sfxExplode.volume = 0.6; // Volumen de la explosión
+        sfxExplode.volume = 0.6;
 
         function playMusic(type) {
             try {
@@ -263,10 +297,8 @@
             } catch(e) { console.error(e); }
         }
 
-        // Función para reproducir explosiones superpuestas
         function playExplosionSound() {
             try {
-                // Clonamos el nodo para permitir polifonía (varias bombas a la vez)
                 const sound = sfxExplode.cloneNode();
                 sound.volume = 0.6;
                 sound.play().catch(e => console.log("Audio block:", e));
@@ -294,6 +326,7 @@
             socket.onerror = () => alert("Error conectando al servidor.");
         }
 
+        // --- RESIZE CANVAS CORREGIDO PARA LANDSCAPE ---
         function resizeCanvas(size) {
             gridSize = size;
             canvas.width = size * TILE;
@@ -301,8 +334,16 @@
             
             const wrapper = document.getElementById('gameWrapper');
             const isMobile = window.innerWidth < 1024;
-            const availableWidth = window.innerWidth - (isMobile ? 20 : 300); 
-            const availableHeight = window.innerHeight - 40;
+            const isLandscape = window.innerWidth > window.innerHeight && isMobile;
+            
+            // En móvil landscape, dejamos más margen para los controles
+            const marginH = isLandscape ? 120 : (isMobile ? 20 : 300);
+            const marginV = isMobile ? 20 : 40;
+
+            const availableWidth = window.innerWidth - marginH; 
+            const availableHeight = window.innerHeight - marginV;
+
+            // En landscape priorizamos que quepa la altura
             const scale = Math.min(availableHeight / canvas.height, availableWidth / canvas.width);
             
             wrapper.style.width = canvas.width + "px";
@@ -312,6 +353,8 @@
         }
         
         window.addEventListener('resize', () => { if(gridSize) resizeCanvas(gridSize); });
+        // También escuchamos el cambio de orientación
+        window.addEventListener('orientationchange', () => { setTimeout(() => { if(gridSize) resizeCanvas(gridSize); }, 200); });
 
         function handleMsg(data) {
             switch(data.type) {
@@ -364,7 +407,7 @@
                     break;
                 case 'explosion': 
                     data.cells.forEach(c => spawnExplosion(c.x+32, c.y+32)); 
-                    playExplosionSound(); // REPRODUCIR SONIDO
+                    playExplosionSound(); 
                     break;
                 case 'map_update': 
                     map[data.y][data.x] = data.val; 
