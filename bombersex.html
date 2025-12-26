@@ -17,16 +17,18 @@
         
         #mainContainer {
             display: flex; align-items: center; justify-content: center;
-            gap: 20px; width: 100%; height: 100%;
+            width: 100%; height: 100%;
+            transition: all 0.3s ease;
         }
 
         #gameWrapper {
             position: relative;
-            box-shadow: 0 0 60px rgba(0, 0, 0, 0.9);
-            border-radius: 12px; overflow: hidden;
-            background: #111; border: 4px solid #334155;
-            transition: transform 0.3s ease; flex-shrink: 0; 
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+            border-radius: 4px; overflow: hidden;
+            background: #000; border: 2px solid #334155;
+            transition: transform 0.2s ease; flex-shrink: 0; 
             transform-origin: center center;
+            z-index: 10; /* El juego va detrás de overlays pero delante del fondo */
         }
 
         #sideHud {
@@ -35,79 +37,98 @@
             padding: 20px; display: flex; flex-direction: column;
             gap: 15px; box-shadow: 0 0 25px rgba(0,0,0,0.6);
             flex-shrink: 0; max-height: 90vh; overflow-y: auto;
+            margin-left: 20px;
         }
 
-        /* --- CONTROLES MÓVILES --- */
+        /* --- ZONA DE CONTROLES (ESTILO CONSOLA) --- */
         #mobileControls {
             display: none; 
             position: fixed; 
-            top: 0; left: 0; width: 100%; height: 100%; 
-            z-index: 100; pointer-events: none;
-            /* Respetar safe areas */
-            padding-left: env(safe-area-inset-left);
-            padding-right: env(safe-area-inset-right);
-            padding-bottom: env(safe-area-inset-bottom);
+            z-index: 50; 
+            pointer-events: none; /* Dejamos pasar clicks en zonas vacías */
         }
 
-        /* MODO VERTICAL (PORTRAIT) - Controles abajo */
+        /* MODO VERTICAL (GAME BOY STYLE) */
         @media (max-width: 1024px) and (orientation: portrait) {
-            #mobileControls { 
-                display: flex; 
-                flex-direction: row;
-                align-items: flex-end; 
-                justify-content: space-between;
-                padding: 20px 40px 40px 40px;
+            #mainContainer {
+                flex-direction: column;
+                justify-content: flex-start; /* Juego arriba */
+                padding-top: 20px;
             }
-            #sideHud { display: none !important; } 
-            #mainContainer { gap: 0; }
-            #mobileHud { display: flex !important; }
-            .dpad { margin-left: 0; }
-            .action-btn { margin-right: 0; margin-bottom: 10px; }
-        }
-
-        /* MODO HORIZONTAL (LANDSCAPE) - Controles en los "pilares" laterales */
-        @media (max-width: 1024px) and (orientation: landscape) {
-            #mobileControls { 
-                display: flex; 
-                flex-direction: row;
-                align-items: center; /* CENTRADO VERTICALMENTE */
-                justify-content: space-between; /* A LOS EXTREMOS */
-                padding: 0 40px; /* Margen seguro lateral */
-            }
-            #sideHud { display: none !important; } 
-            #mainContainer { gap: 0; }
-            #mobileHud { display: flex !important; }
             
-            /* Ajustes para que queden bien centrados en sus áreas */
-            .dpad { 
-                pointer-events: auto;
-                transform: scale(1.1); /* Un poco más grandes para comodidad */
+            #mobileControls {
+                display: flex;
+                bottom: 0; left: 0; width: 100%; height: 240px; /* Panel inferior fijo */
+                background: rgba(15, 23, 42, 0.95); /* Fondo sólido para controles */
+                border-top: 4px solid #334155;
+                box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
+                align-items: center;
+                justify-content: space-around; /* Separar D-pad y Botón */
+                padding-bottom: 20px; /* Espacio para safe area */
+                pointer-events: auto; /* Activar clicks aquí */
             }
-            .action-btn { 
-                pointer-events: auto;
-                transform: scale(1.1);
-                margin-bottom: 0; /* Sin margen inferior, centrado puro */
-            }
+
+            #sideHud { display: none !important; } 
+            #mobileHud { display: flex !important; width: 90%; justify-content: space-around; margin-bottom: 10px; }
+
+            /* Ajuste Dpad y Botón */
+            .dpad { transform: scale(1.0); }
+            .action-btn { transform: scale(1.0); }
         }
 
-        .dpad { position: relative; width: 160px; height: 160px; pointer-events: auto; }
-        .d-btn {
-            position: absolute; background: rgba(255, 255, 255, 0.15);
-            border: 2px solid rgba(255,255,255,0.3); border-radius: 10px;
-            width: 50px; height: 50px; backdrop-filter: blur(4px);
+        /* MODO HORIZONTAL (PSP STYLE) */
+        @media (max-width: 1024px) and (orientation: landscape) {
+            #mainContainer {
+                justify-content: center;
+                align-items: center;
+            }
+
+            #mobileControls {
+                display: flex;
+                top: 0; left: 0; width: 100%; height: 100%;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0 20px; /* Margen seguro lateral */
+                pointer-events: none; /* El fondo es transparente */
+            }
+            
+            /* Áreas táctiles activas */
+            .control-zone-left, .control-zone-right {
+                width: 160px; height: 100%;
+                display: flex; align-items: center; justify-content: center;
+                pointer-events: auto;
+                background: rgba(0,0,0,0.2); /* Sutil zona oscura */
+                border-radius: 20px;
+            }
+
+            #sideHud { display: none !important; } 
+            #mobileHud { display: flex !important; position: absolute; top: 10px; width: 60%; justify-content: center; gap: 20px;}
+            
+            .dpad { transform: scale(1.1); }
+            .action-btn { transform: scale(1.1); }
         }
-        .d-btn:active { background: rgba(250, 204, 21, 0.5); border-color: #facc15; }
+
+        .dpad { position: relative; width: 160px; height: 160px; }
+        .d-btn {
+            position: absolute; background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255,255,255,0.2); border-radius: 12px;
+            width: 50px; height: 50px; backdrop-filter: blur(4px);
+            transition: all 0.1s;
+        }
+        .d-btn:active { background: rgba(250, 204, 21, 0.6); border-color: #facc15; transform: scale(0.95); }
         .d-up { top: 0; left: 55px; } .d-down { bottom: 0; left: 55px; }
         .d-left { top: 55px; left: 0; } .d-right { top: 55px; right: 0; }
 
         .action-btn {
-            pointer-events: auto; width: 90px; height: 90px;
-            border-radius: 50%; background: rgba(239, 68, 68, 0.3);
-            border: 4px solid rgba(239, 68, 68, 0.6); backdrop-filter: blur(4px);
+            width: 90px; height: 90px;
+            border-radius: 50%; background: rgba(220, 38, 38, 0.2);
+            border: 4px solid rgba(239, 68, 68, 0.5); backdrop-filter: blur(4px);
             display: flex; align-items: center; justify-content: center;
-            font-size: 2rem;
+            font-size: 2.5rem; color: rgba(255,255,255,0.8);
+            box-shadow: 0 0 15px rgba(220, 38, 38, 0.3);
+            transition: all 0.1s;
         }
-        .action-btn:active { background: rgba(239, 68, 68, 0.8); transform: scale(0.95); }
+        .action-btn:active { background: rgba(239, 68, 68, 0.8); transform: scale(0.9); box-shadow: 0 0 25px rgba(220, 38, 38, 0.6); }
 
         .stat-box {
             background: rgba(255,255,255,0.05); padding: 12px;
@@ -122,7 +143,7 @@
         .ui-overlay {
             position: absolute; top: 0; left: 0; right: 0; bottom: 0;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            background: rgba(15, 23, 42, 0.98); z-index: 50;
+            background: rgba(15, 23, 42, 0.98); z-index: 60;
         }
         .hidden { display: none !important; }
         
@@ -160,16 +181,16 @@
         }
         
         #mobileHud {
-            display: none; position: absolute; top: 10px; left: 10px;
-            background: rgba(0,0,0,0.6); padding: 5px 15px;
-            border-radius: 20px; gap: 15px; pointer-events: none; z-index: 5;
+            display: none; background: rgba(0,0,0,0.8); padding: 8px 15px;
+            border-radius: 20px; gap: 15px; pointer-events: none; z-index: 20;
+            border: 1px solid #334155;
         }
 
         #gameTimer {
             position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
             background: rgba(0,0,0,0.8); padding: 5px 20px; border-radius: 20px;
             border: 2px solid #334155; font-size: 1.5rem; font-weight: 900;
-            color: white; z-index: 10; font-family: monospace;
+            color: white; z-index: 20; font-family: monospace;
         }
         #gameTimer.danger {
             border-color: #ef4444; color: #ef4444;
@@ -184,29 +205,21 @@
     <audio id="sfxExplode" src="8 Explosion.mp3" preload="auto"></audio>
 
     <div id="mainContainer">
+        
+        <!-- HUD MÓVIL (Ahora fuera del wrapper en portrait) -->
+        <div id="mobileHud">
+            <span class="text-red-400 font-bold">🔥 <span id="mRange">1</span></span>
+            <span class="text-blue-400 font-bold">💣 <span id="mBombs">1</span></span>
+            <span class="text-yellow-400 font-bold">⚡ <span id="mSpeed">N</span></span>
+            <span id="mGhost" class="hidden text-purple-400 font-bold animate-pulse">👻 <span id="ghostTimer">15</span>s</span>
+        </div>
+
         <div id="gameWrapper">
             <div id="roomCodeTag" class="room-code-display hidden">SALA: <span id="currentRoomCode">----</span></div>
             <div id="gameTimer" class="hidden">04:00</div>
-
-            <div id="mobileHud">
-                <span class="text-red-400 font-bold">🔥 <span id="mRange">1</span></span>
-                <span class="text-blue-400 font-bold">💣 <span id="mBombs">1</span></span>
-                <span class="text-yellow-400 font-bold">⚡ <span id="mSpeed">N</span></span>
-                <span id="mGhost" class="hidden text-purple-400 font-bold animate-pulse">👻 <span id="ghostTimer">15</span>s</span>
-            </div>
-
             <canvas id="gameCanvas" width="960" height="960"></canvas>
-
-            <div id="mobileControls">
-                <div class="dpad">
-                    <div class="d-btn d-up" data-key="w"></div>
-                    <div class="d-btn d-down" data-key="s"></div>
-                    <div class="d-btn d-left" data-key="a"></div>
-                    <div class="d-btn d-right" data-key="d"></div>
-                </div>
-                <div class="action-btn" data-key="bomb">💣</div>
-            </div>
-
+            
+            <!-- OVERLAYS DENTRO DEL WRAPPER (MENÚS) -->
             <div id="mainMenu" class="ui-overlay">
                 <div class="w-80 p-8 bg-slate-900 border-2 border-slate-700 rounded-2xl shadow-2xl text-center relative">
                     <h1 class="text-4xl font-black text-white mb-6 italic tracking-tighter">BOMBER<br><span class="text-yellow-500">ARENA</span></h1>
@@ -252,6 +265,21 @@
             <div class="stat-box" style="border-color: #eab308;"><div><div class="stat-label">VELOCIDAD</div><div class="text-xs text-yellow-400">Move</div></div><div class="stat-val text-yellow-500">⚡ <span id="hudSpeed">NORMAL</span></div></div>
             <div id="hudKick" class="stat-box hidden" style="border-color: #22c55e; background: rgba(34, 197, 94, 0.1);"><div class="w-full text-center text-green-400 font-bold tracking-widest">👟 KICKER ACTIVO</div></div>
             <div id="hudGhost" class="stat-box hidden" style="border-color: #a855f7; background: rgba(168, 85, 247, 0.1);"><div class="w-full text-center text-purple-400 font-bold tracking-widest animate-pulse">👻 GHOST (<span id="hudGhostTimer">15</span>s)</div></div>
+        </div>
+    </div>
+
+    <!-- CONTROLES MÓVILES (Fuera del wrapper) -->
+    <div id="mobileControls">
+        <div class="control-zone-left">
+            <div class="dpad">
+                <div class="d-btn d-up" data-key="w"></div>
+                <div class="d-btn d-down" data-key="s"></div>
+                <div class="d-btn d-left" data-key="a"></div>
+                <div class="d-btn d-right" data-key="d"></div>
+            </div>
+        </div>
+        <div class="control-zone-right">
+            <div class="action-btn" data-key="bomb">💣</div>
         </div>
     </div>
 
@@ -331,7 +359,7 @@
             socket.onerror = () => alert("Error conectando al servidor.");
         }
 
-        // --- RESIZE CANVAS AJUSTADO PARA DEJAR PILARES LATERALES ---
+        // --- RESIZE CANVAS "CONSOLE MODE" ---
         function resizeCanvas(size) {
             gridSize = size;
             canvas.width = size * TILE;
@@ -341,13 +369,22 @@
             const isMobile = window.innerWidth < 1024;
             const isLandscape = window.innerWidth > window.innerHeight && isMobile;
             
-            // En modo Landscape, reservamos 300px totales (150px a cada lado) para los controles
-            // Esto forzará al juego a encogerse y dejar espacio vacío.
-            const marginH = isLandscape ? 300 : (isMobile ? 20 : 300);
-            const marginV = isMobile ? 20 : 40;
+            let availableWidth, availableHeight;
 
-            const availableWidth = window.innerWidth - marginH; 
-            const availableHeight = window.innerHeight - marginV;
+            if (isLandscape) {
+                // MODO PSP: Restamos 320px (160+160) de ancho para los controles laterales
+                // Esto fuerza al juego a encogerse y dejar esos pilares libres
+                availableWidth = window.innerWidth - 320; 
+                availableHeight = window.innerHeight - 20; 
+            } else if (isMobile) {
+                // MODO GAMEBOY: Restamos 240px de altura para el panel inferior
+                availableWidth = window.innerWidth - 20;
+                availableHeight = window.innerHeight - 260; // 240 del panel + 20 margen
+            } else {
+                // ESCRITORIO
+                availableWidth = window.innerWidth - 300; // Sidebar
+                availableHeight = window.innerHeight - 40;
+            }
 
             // Calculamos la escala con el espacio reducido
             const scale = Math.min(availableHeight / canvas.height, availableWidth / canvas.width);
@@ -355,7 +392,8 @@
             wrapper.style.width = canvas.width + "px";
             wrapper.style.height = canvas.height + "px";
             wrapper.style.transform = `scale(${Math.min(scale, 1)})`; 
-            wrapper.style.transformOrigin = "center center"; 
+            // En GameBoy mode, alineamos arriba para dejar espacio abajo
+            wrapper.style.transformOrigin = (isMobile && !isLandscape) ? "top center" : "center center";
         }
         
         window.addEventListener('resize', () => { if(gridSize) resizeCanvas(gridSize); });
