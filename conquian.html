@@ -18,8 +18,6 @@
             background-position: 0 0, 30px 30px;
         }
         .glow-card { box-shadow: 0 0 20px 5px rgba(251, 191, 36, 0.8); transform: scale(1.1); }
-        
-        /* Animación para indicar que las cartas son clickeables en el intercambio */
         .exchange-highlight { animation: pulse-border 2s infinite; }
         @keyframes pulse-border {
             0% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.4); }
@@ -30,77 +28,60 @@
 </head>
 <body class="felt-bg h-screen text-gray-100 font-sans overflow-hidden">
 
-    <!-- PANTALLA DE LOGIN -->
+    <!-- LOGIN -->
     <div id="loginScreen" class="flex flex-col items-center justify-center h-full bg-black/60 fixed inset-0 z-50">
         <div class="bg-white text-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full border-4 border-yellow-600">
             <h1 class="text-4xl font-bold text-center mb-6 text-yellow-700">Conquián MX</h1>
             <input type="text" id="aliasInput" class="w-full p-3 border rounded mb-4 bg-gray-50" placeholder="Tu Apodo">
-            
             <div class="grid grid-cols-2 gap-4">
                 <button onclick="createRoom()" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 rounded">Crear Sala</button>
                 <button onclick="document.getElementById('joinSection').classList.remove('hidden')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded">Unirse</button>
             </div>
-
             <div id="joinSection" class="hidden mt-4">
-                <input type="text" id="roomCodeInput" oninput="this.value = this.value.toUpperCase()" class="w-full p-2 border rounded mb-2 uppercase font-mono text-center tracking-widest text-xl" placeholder="CÓDIGO SALA" maxlength="4">
+                <input type="text" id="roomCodeInput" oninput="this.value = this.value.toUpperCase()" class="w-full p-2 border rounded mb-2 uppercase font-mono text-center tracking-widest text-xl" placeholder="CÓDIGO" maxlength="4">
                 <button id="btnJoin" onclick="joinRoom()" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded">Entrar</button>
             </div>
-            
             <p id="errorMsg" class="text-red-500 text-center mt-2 font-bold min-h-[24px]"></p>
         </div>
     </div>
 
-    <!-- PANTALLA DE LOBBY (ESPERA) -->
+    <!-- LOBBY -->
     <div id="lobbyScreen" class="hidden flex flex-col items-center justify-center h-full bg-black/80 fixed inset-0 z-40">
         <div class="bg-gray-800 p-8 rounded-xl max-w-lg w-full text-center border border-yellow-500">
             <h2 class="text-3xl text-yellow-400 mb-2">Sala: <span id="lobbyCode" class="text-white font-mono bg-gray-700 px-2 rounded"></span></h2>
-            <p class="text-gray-400 mb-6">Esperando jugadores (Máx 4)...</p>
-            
-            <ul id="lobbyList" class="text-left space-y-2 mb-6 bg-gray-900 p-4 rounded min-h-[100px]">
-                <!-- Lista de jugadores se renderiza aquí -->
-            </ul>
-
+            <p class="text-gray-400 mb-6">Esperando jugadores...</p>
+            <ul id="lobbyList" class="text-left space-y-2 mb-6 bg-gray-900 p-4 rounded min-h-[100px]"></ul>
             <div id="hostControls" class="hidden">
-                <button onclick="startGame()" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded shadow-lg text-lg animate-pulse">
-                    INICIAR PARTIDA
-                </button>
+                <button onclick="startGame()" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded shadow-lg text-lg animate-pulse">INICIAR PARTIDA</button>
             </div>
             <p id="waitMsg" class="text-yellow-200/50 mt-4 text-sm italic">Solo el anfitrión puede iniciar.</p>
         </div>
     </div>
 
-    <!-- PANTALLA DE JUEGO -->
+    <!-- JUEGO -->
     <div id="gameScreen" class="hidden h-full flex flex-col relative">
-        <!-- Header -->
         <div class="bg-black/40 p-2 flex justify-between items-center px-4 z-10">
             <div class="font-bold text-yellow-400">Sala: <span id="gameRoomCode"></span></div>
-            <div id="gameStatus" class="bg-gray-700 px-4 py-1 rounded-full text-sm font-bold">Esperando...</div>
+            <div id="gameStatus" class="bg-gray-700 px-4 py-1 rounded-full text-sm font-bold">Iniciando...</div>
         </div>
 
-        <!-- Tablero -->
         <div class="flex-1 flex flex-col relative p-2">
-            
-            <!-- Zona de Avisos Sistema -->
             <div id="systemMsg" class="absolute top-12 left-0 right-0 text-center pointer-events-none z-20">
                 <span class="bg-black/60 text-yellow-200 px-4 py-2 rounded-full text-sm shadow-lg backdrop-blur hidden"></span>
             </div>
 
-            <!-- Área Central: Mazo y Descarte -->
             <div class="flex-1 flex justify-center items-center gap-8 md:gap-16">
-                <!-- Mazo -->
+                <!-- Mazo con ruta corregida a cards/reverso.png -->
                 <div class="relative">
-                    <div class="w-24 h-36 bg-blue-900 border-2 border-white rounded-lg shadow-xl flex items-center justify-center bg-[url('img/reverso.png')] bg-cover bg-center">
+                    <div class="w-24 h-36 bg-blue-900 border-2 border-white rounded-lg shadow-xl flex items-center justify-center bg-[url('cards/reverso.png')] bg-cover bg-center">
                         <span id="deckCount" class="absolute -top-3 -right-3 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow">40</span>
                     </div>
                 </div>
 
-                <!-- Descarte / Carta Activa -->
                 <div class="relative">
                     <div id="discardPile" class="w-24 h-36 border-2 border-dashed border-white/30 rounded-lg flex items-center justify-center transition-all duration-300">
                         <span class="text-white/30 text-xs">Descarte</span>
                     </div>
-                    
-                    <!-- Botones de Acción (Tomar/Pasar) -->
                     <div id="actionButtons" class="hidden absolute -bottom-16 left-1/2 transform -translate-x-1/2 flex gap-2 w-max z-30">
                         <button onclick="respondOffer('take')" class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded shadow font-bold text-sm">TOMAR</button>
                         <button onclick="respondOffer('pass')" class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded shadow font-bold text-sm">PASAR</button>
@@ -108,23 +89,22 @@
                 </div>
             </div>
 
-            <!-- Mano del Jugador (CORREGIDO: z-index dinámico y ID añadido) -->
             <div id="handContainer" class="h-40 flex flex-col justify-end pb-2 relative z-0">
                 <p id="handInstruction" class="text-center text-xs text-yellow-200/70 mb-1">Tu Mano</p>
                 <div id="myHand" class="flex justify-center -space-x-4 overflow-visible px-4 min-h-[120px]"></div>
             </div>
         </div>
 
-        <!-- Overlay de Intercambio (z-50) -->
+        <!-- Overlay Intercambio -->
         <div id="exchangeOverlay" class="hidden absolute inset-0 bg-black/80 z-50 flex flex-col items-center justify-center">
             <h2 class="text-3xl text-yellow-400 font-bold mb-4">Fase de Intercambio</h2>
-            <p id="exchangeText" class="text-white mb-8 text-center max-w-md">Selecciona una carta de tu mano (abajo) para pasarla al jugador de tu derecha.</p>
+            <p id="exchangeText" class="text-white mb-8 text-center max-w-md">Selecciona una carta de tu mano para pasarla a la derecha.</p>
             <div id="exchangeArrow" class="animate-bounce text-yellow-500 text-2xl"><i class="fas fa-arrow-down"></i></div>
         </div>
     </div>
 
     <script>
-        // --- CONFIGURACIÓN ---
+        // CONFIGURAR URL AQUÍ
         const SERVER_URL = 'https://conquian.onrender.com';
         const socket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
 
@@ -137,7 +117,6 @@
             isMyTurn: false
         };
 
-        // --- DOM Elements ---
         const els = {
             login: document.getElementById('loginScreen'),
             lobby: document.getElementById('lobbyScreen'),
@@ -146,7 +125,7 @@
             lobbyList: document.getElementById('lobbyList'),
             hostControls: document.getElementById('hostControls'),
             hand: document.getElementById('myHand'),
-            handContainer: document.getElementById('handContainer'), // Nuevo
+            handContainer: document.getElementById('handContainer'),
             discard: document.getElementById('discardPile'),
             status: document.getElementById('gameStatus'),
             actions: document.getElementById('actionButtons'),
@@ -156,8 +135,7 @@
             exchangeArrow: document.getElementById('exchangeArrow')
         };
 
-        // --- SOCKET EVENTS ---
-
+        // SOCKET EVENTS
         socket.on('room_created', data => {
             myState.roomCode = data.roomCode;
             myState.alias = data.alias;
@@ -175,32 +153,23 @@
             showMsg(`${data.alias} entró.`);
         });
 
-        socket.on('lobby_update', data => {
-            renderLobbyList(data.players);
-        });
+        socket.on('lobby_update', data => renderLobbyList(data.players));
 
         socket.on('game_start_exchange', data => {
             myState.hand = data.hand;
             myState.phase = 'EXCHANGE';
             showGame();
-            
-            // CORRECCIÓN VISUAL: Mostrar overlay y levantar la mano por encima
             els.exchangeOverlay.classList.remove('hidden');
             els.handContainer.classList.remove('z-0');
-            els.handContainer.classList.add('z-[60]'); // Encima del overlay (z-50)
-            
-            els.exchangeText.innerText = "Selecciona una carta de tu mano para pasarla a la derecha.";
+            els.handContainer.classList.add('z-[60]');
+            els.exchangeText.innerText = "Selecciona carta para pasar a la derecha.";
             els.exchangeArrow.classList.remove('hidden');
-            
             renderHand();
-            showMsg("¡Intercambio de cartas!");
         });
 
         socket.on('exchange_wait', data => {
-            // Usuario ya seleccionó
             els.exchangeText.innerHTML = `<span class="text-2xl animate-pulse">${data.msg}</span>`;
             els.exchangeArrow.classList.add('hidden');
-            // Ya no dejamos clickear más
             els.handContainer.classList.remove('z-[60]');
             els.handContainer.classList.add('z-0');
         });
@@ -208,28 +177,15 @@
         socket.on('exchange_complete', data => {
             myState.hand = data.newHand;
             els.exchangeOverlay.classList.add('hidden');
-            
-            // RESET: Volver a normalidad
             els.handContainer.classList.remove('z-[60]');
             els.handContainer.classList.add('z-0');
-
             showMsg(`Recibiste: ${translateRank(data.receivedCard.rank)} de ${data.receivedCard.suit}`);
             renderHand();
         });
 
-        socket.on('game_state_update', data => {
-            updateGameState(data);
-        });
-
-        socket.on('hand_update', data => {
-            myState.hand = data.hand;
-            renderHand();
-        });
-
-        socket.on('system_msg', data => {
-            showMsg(data.msg);
-        });
-
+        socket.on('game_state_update', data => updateGameState(data));
+        socket.on('hand_update', data => { myState.hand = data.hand; renderHand(); });
+        socket.on('system_msg', data => showMsg(data.msg));
         socket.on('error', data => {
             els.error.innerText = data.msg;
             const btn = document.getElementById('btnJoin');
@@ -237,44 +193,35 @@
             setTimeout(() => els.error.innerText = '', 3000);
         });
 
-        // --- FUNCIONES LOGICA ---
-
+        // LOGIC
         function createRoom() {
             const alias = document.getElementById('aliasInput').value;
-            if(!alias) { els.error.innerText = "Ingresa un alias"; return; }
+            if(!alias) return;
             socket.emit('create_room', { alias });
         }
-
         function joinRoom() {
             const alias = document.getElementById('aliasInput').value;
             const code = document.getElementById('roomCodeInput').value;
-            if(!alias || !code) { els.error.innerText = "Faltan datos"; return; }
+            if(!alias || !code) return;
             const btn = document.getElementById('btnJoin');
             btn.disabled = true;
             btn.innerText = "Entrando...";
             myState.alias = alias;
             socket.emit('join_room', { alias, roomCode: code });
         }
-
-        function startGame() {
-            socket.emit('start_game_request', { roomCode: myState.roomCode });
-        }
+        function startGame() { socket.emit('start_game_request', { roomCode: myState.roomCode }); }
 
         function updateGameState(data) {
             myState.phase = data.phase;
-            const activeId = data.activePlayerId;
-            const amIActive = (activeId === socket.id);
-            
+            const amIActive = (data.activePlayerId === socket.id);
             document.getElementById('deckCount').innerText = data.deckCount;
             
+            // Render Descarte
             const discardEl = els.discard;
             discardEl.innerHTML = '';
-            
             if (data.topCard) {
                 discardEl.appendChild(createCardEl(data.topCard, false));
-                if (data.phase === 'OFFER') {
-                    discardEl.firstElementChild.classList.add('glow-card');
-                }
+                if (data.phase === 'OFFER') discardEl.firstElementChild.classList.add('glow-card');
             } else {
                 discardEl.innerHTML = '<span class="text-white/30 text-xs">Vacío</span>';
             }
@@ -282,13 +229,15 @@
             els.actions.classList.add('hidden');
             els.handInstruction.innerText = "Tu Mano";
 
+            const activeName = amIActive ? "TI" : (data.activePlayerAlias || "Oponente");
+
             if (data.phase === 'OFFER') {
                 if (amIActive) {
                     els.status.innerText = "🔴 ¿QUIERES LA CARTA?";
                     els.status.className = "bg-red-600 px-4 py-1 rounded-full text-sm font-bold animate-pulse";
                     els.actions.classList.remove('hidden');
                 } else {
-                    els.status.innerText = `Esperando a ${activeId === socket.id ? 'ti' : 'oponente'}...`;
+                    els.status.innerText = `Esperando a ${activeName}...`;
                     els.status.className = "bg-gray-700 px-4 py-1 rounded-full text-sm";
                 }
             } else if (data.phase === 'DISCARDING') {
@@ -297,7 +246,7 @@
                     els.status.className = "bg-green-600 px-4 py-1 rounded-full text-sm font-bold";
                     els.handInstruction.innerText = "Selecciona carta para descartar";
                 } else {
-                    els.status.innerText = "Oponente jugando...";
+                    els.status.innerText = `${activeName} está jugando...`;
                     els.status.className = "bg-gray-700 px-4 py-1 rounded-full text-sm";
                 }
             }
@@ -307,7 +256,6 @@
         function handleCardClick(cardId, element) {
             if (myState.phase === 'EXCHANGE') {
                 if (confirm("¿Pasar esta carta a la derecha?")) {
-                    // Feedback visual inmediato
                     if(element) element.style.opacity = '0.5';
                     socket.emit('submit_exchange_card', { roomCode: myState.roomCode, cardId });
                 }
@@ -321,14 +269,12 @@
             els.actions.classList.add('hidden');
         }
 
-        // --- RENDERIZADO ---
-
+        // RENDER HELPERS
         function showLobby() {
             els.login.classList.add('hidden');
             els.lobby.classList.remove('hidden');
             document.getElementById('lobbyCode').innerText = myState.roomCode;
         }
-
         function renderLobbyList(players) {
             if (!players) return;
             els.lobbyList.innerHTML = players.map(p => 
@@ -337,7 +283,6 @@
                     ${p.isHost ? '<span class="text-xs bg-yellow-600 px-1 rounded">HOST</span>' : ''}
                 </li>`
             ).join('');
-
             const me = players.find(p => p.alias === myState.alias);
             if (me && me.isHost) {
                 myState.isHost = true;
@@ -345,35 +290,40 @@
                 document.getElementById('waitMsg').classList.add('hidden');
             }
         }
-
         function showGame() {
             els.lobby.classList.add('hidden');
             els.game.classList.remove('hidden');
             document.getElementById('gameRoomCode').innerText = myState.roomCode;
         }
-
         function renderHand() {
             els.hand.innerHTML = '';
             myState.hand.forEach(card => {
                 const el = createCardEl(card, true);
-                
-                // Si estamos en intercambio, resaltar que son interactivos
-                if (myState.phase === 'EXCHANGE') {
-                    el.classList.add('exchange-highlight', 'cursor-pointer');
-                }
-
+                if (myState.phase === 'EXCHANGE') el.classList.add('exchange-highlight', 'cursor-pointer');
                 el.onclick = () => handleCardClick(card.id, el);
                 els.hand.appendChild(el);
             });
         }
-
+        
+        // --- FUNCIÓN CORREGIDA PARA LAS IMÁGENES ---
         function createCardEl(card, interactive) {
             const el = document.createElement('div');
-            const imageSrc = `img/${card.rank}-${card.suit}.png`;
+            
+            // 1. Convertir palo a minúsculas ('Oros' -> 'oros')
+            const suitLower = card.suit.toLowerCase();
+            
+            // 2. Rellenar con cero si es menor de 10 ('1' -> '01')
+            const rankPad = card.rank < 10 ? '0' + card.rank : card.rank;
+            
+            // 3. Construir ruta exacta: cards/01-oros.png
+            const imageSrc = `cards/${rankPad}-${suitLower}.png`;
+            
             el.className = `card w-20 h-32 rounded-lg shadow-md bg-white relative flex items-center justify-center ${interactive ? 'cursor-pointer hover:border-yellow-400 border-2 border-transparent' : ''}`;
             
             el.innerHTML = `
                 <img src="${imageSrc}" class="w-full h-full object-contain rounded-lg" onerror="this.nextElementSibling.classList.remove('hidden'); this.style.display='none'">
+                
+                <!-- Fallback si la imagen no carga -->
                 <div class="hidden w-full h-full flex flex-col items-center justify-between p-1 rounded-lg ${getSuitColor(card.suit)}">
                     <div class="font-bold leading-none">${translateRank(card.rank)}</div>
                     <div class="text-2xl"><i class="${getSuitIcon(card.suit)}"></i></div>
@@ -382,23 +332,18 @@
             `;
             return el;
         }
-
+        
         function showMsg(txt) {
             if (!txt) return;
             els.sysMsg.innerText = txt;
             els.sysMsg.classList.remove('hidden');
             els.sysMsg.parentElement.classList.remove('hidden');
             clearTimeout(window.msgTimeout);
-            window.msgTimeout = setTimeout(() => {
-                els.sysMsg.classList.add('hidden');
-            }, 3000);
+            window.msgTimeout = setTimeout(() => els.sysMsg.classList.add('hidden'), 3000);
         }
-
-        // Helpers
         function translateRank(r) { return r===10?'S':r===11?'C':r===12?'R':r; }
         function getSuitColor(s) { return s==='Oros'?'text-yellow-600':s==='Copas'?'text-red-600':s==='Espadas'?'text-blue-600':'text-green-700'; }
         function getSuitIcon(s) { return s==='Oros'?'fas fa-sun':s==='Copas'?'fas fa-wine-glass':s==='Espadas'?'fas fa-khanda':'fas fa-tree'; }
-
     </script>
 </body>
 </html>
