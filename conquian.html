@@ -18,12 +18,10 @@
             background-position: 0 0, 30px 30px;
         }
         .glow-card { box-shadow: 0 0 20px 5px rgba(251, 191, 36, 0.8); transform: scale(1.1); }
-        .exchange-highlight { animation: pulse-border 2s infinite; }
-        @keyframes pulse-border {
-            0% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(234, 179, 8, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0); }
-        }
+        .selected-card { border: 4px solid #facc15; transform: translateY(-15px); }
+        
+        /* Zona de juegos bajados (pequeños) */
+        .meld-card { width: 40px; height: 60px; }
     </style>
 </head>
 <body class="felt-bg h-screen text-gray-100 font-sans overflow-hidden">
@@ -61,289 +59,242 @@
     <!-- JUEGO -->
     <div id="gameScreen" class="hidden h-full flex flex-col relative">
         <div class="bg-black/40 p-2 flex justify-between items-center px-4 z-10">
-            <div class="font-bold text-yellow-400">Sala: <span id="gameRoomCode"></span></div>
-            <div id="gameStatus" class="bg-gray-700 px-4 py-1 rounded-full text-sm font-bold">Iniciando...</div>
+            <div class="font-bold text-yellow-400 text-sm">Sala: <span id="gameRoomCode"></span></div>
+            <div id="gameStatus" class="bg-gray-700 px-4 py-1 rounded-full text-xs md:text-sm font-bold truncate max-w-[200px]">Iniciando...</div>
         </div>
 
         <div class="flex-1 flex flex-col relative p-2">
-            <div id="systemMsg" class="absolute top-12 left-0 right-0 text-center pointer-events-none z-20">
-                <span class="bg-black/60 text-yellow-200 px-4 py-2 rounded-full text-sm shadow-lg backdrop-blur hidden"></span>
+            <!-- Zona de Juegos Bajados (Melds) -->
+            <div id="meldsArea" class="h-1/4 border-b border-white/10 flex flex-wrap gap-4 p-2 overflow-y-auto justify-center">
+                <!-- Aquí van los juegos de todos -->
             </div>
 
-            <div class="flex-1 flex justify-center items-center gap-8 md:gap-16">
-                <!-- Mazo con ruta corregida a cards/reverso.png -->
+            <!-- Centro: Mazo y Carta Mesa -->
+            <div class="h-1/3 flex justify-center items-center gap-8 md:gap-16 relative mt-4">
+                <!-- Mazo -->
                 <div class="relative">
                     <div class="w-24 h-36 bg-blue-900 border-2 border-white rounded-lg shadow-xl flex items-center justify-center bg-[url('cards/reverso.png')] bg-cover bg-center">
                         <span id="deckCount" class="absolute -top-3 -right-3 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow">40</span>
                     </div>
                 </div>
 
+                <!-- Carta Activa (Mesa) -->
                 <div class="relative">
-                    <div id="discardPile" class="w-24 h-36 border-2 border-dashed border-white/30 rounded-lg flex items-center justify-center transition-all duration-300">
-                        <span class="text-white/30 text-xs">Descarte</span>
+                    <div id="tableCard" class="w-24 h-36 border-2 border-dashed border-white/30 rounded-lg flex items-center justify-center transition-all duration-300">
+                        <span class="text-white/30 text-xs">Mesa</span>
                     </div>
-                    <div id="actionButtons" class="hidden absolute -bottom-16 left-1/2 transform -translate-x-1/2 flex gap-2 w-max z-30">
-                        <button onclick="respondOffer('take')" class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded shadow font-bold text-sm">TOMAR</button>
-                        <button onclick="respondOffer('pass')" class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded shadow font-bold text-sm">PASAR</button>
+                    
+                    <!-- Botones Oferta -->
+                    <div id="offerButtons" class="hidden absolute -bottom-14 left-1/2 transform -translate-x-1/2 flex gap-2 w-max z-30">
+                        <button onclick="respondOffer('take')" class="bg-green-600 hover:bg-green-500 text-white px-3 py-2 rounded shadow font-bold text-xs uppercase">Me Sirve</button>
+                        <button onclick="respondOffer('pass')" class="bg-red-600 hover:bg-red-500 text-white px-3 py-2 rounded shadow font-bold text-xs uppercase">Pasar</button>
+                    </div>
+
+                    <!-- Botón Confirmar Bajada -->
+                    <div id="meldConfirmBtn" class="hidden absolute -bottom-14 left-1/2 transform -translate-x-1/2 w-max z-30">
+                        <button onclick="submitMeld()" class="bg-yellow-600 hover:bg-yellow-500 text-black px-4 py-2 rounded shadow font-bold text-xs uppercase animate-pulse">BAJAR JUEGO</button>
                     </div>
                 </div>
             </div>
 
-            <div id="handContainer" class="h-40 flex flex-col justify-end pb-2 relative z-0">
+            <!-- Mano del Jugador -->
+            <div id="handContainer" class="flex-1 flex flex-col justify-end pb-2 relative z-0">
                 <p id="handInstruction" class="text-center text-xs text-yellow-200/70 mb-1">Tu Mano</p>
                 <div id="myHand" class="flex justify-center -space-x-4 overflow-visible px-4 min-h-[120px]"></div>
             </div>
         </div>
+        
+        <!-- Mensajes Sistema -->
+        <div id="systemMsg" class="absolute top-20 left-1/2 transform -translate-x-1/2 bg-black/80 text-yellow-200 px-6 py-2 rounded-full text-sm shadow-xl backdrop-blur hidden z-50 text-center w-max max-w-[90%]"></div>
 
         <!-- Overlay Intercambio -->
-        <div id="exchangeOverlay" class="hidden absolute inset-0 bg-black/80 z-50 flex flex-col items-center justify-center">
-            <h2 class="text-3xl text-yellow-400 font-bold mb-4">Fase de Intercambio</h2>
-            <p id="exchangeText" class="text-white mb-8 text-center max-w-md">Selecciona una carta de tu mano para pasarla a la derecha.</p>
+        <div id="exchangeOverlay" class="hidden absolute inset-0 bg-black/80 z-50 flex flex-col items-center justify-center p-4">
+            <h2 class="text-2xl text-yellow-400 font-bold mb-4">Intercambio</h2>
+            <p id="exchangeText" class="text-white mb-8 text-center">Pasa una carta a la derecha.</p>
             <div id="exchangeArrow" class="animate-bounce text-yellow-500 text-2xl"><i class="fas fa-arrow-down"></i></div>
         </div>
     </div>
 
     <script>
-        // CONFIGURAR URL AQUÍ
         const SERVER_URL = 'https://conquian.onrender.com';
         const socket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
 
         let myState = {
-            alias: '',
-            roomCode: '',
-            isHost: false,
-            hand: [],
-            phase: 'LOBBY', 
-            isMyTurn: false
+            alias: '', roomCode: '', isHost: false, hand: [], phase: 'LOBBY', 
+            selectedCards: [] // IDs de cartas seleccionadas para bajar
         };
 
         const els = {
             login: document.getElementById('loginScreen'),
             lobby: document.getElementById('lobbyScreen'),
             game: document.getElementById('gameScreen'),
-            error: document.getElementById('errorMsg'),
-            lobbyList: document.getElementById('lobbyList'),
-            hostControls: document.getElementById('hostControls'),
             hand: document.getElementById('myHand'),
-            handContainer: document.getElementById('handContainer'),
-            discard: document.getElementById('discardPile'),
+            table: document.getElementById('tableCard'),
             status: document.getElementById('gameStatus'),
-            actions: document.getElementById('actionButtons'),
-            sysMsg: document.getElementById('systemMsg').firstElementChild,
+            offerBtns: document.getElementById('offerButtons'),
+            meldBtn: document.getElementById('meldConfirmBtn'),
+            meldsArea: document.getElementById('meldsArea'),
+            sysMsg: document.getElementById('systemMsg'),
             exchangeOverlay: document.getElementById('exchangeOverlay'),
-            exchangeText: document.getElementById('exchangeText'),
-            exchangeArrow: document.getElementById('exchangeArrow')
+            exchangeText: document.getElementById('exchangeText')
         };
 
-        // SOCKET EVENTS
-        socket.on('room_created', data => {
-            myState.roomCode = data.roomCode;
-            myState.alias = data.alias;
-            myState.isHost = data.isHost;
-            renderLobbyList(data.players);
-            showLobby();
+        // --- SOCKET ---
+        socket.on('room_created', d => { myState.roomCode=d.roomCode; myState.alias=d.alias; myState.isHost=d.isHost; renderLobby(d.players); showLobby(); });
+        socket.on('player_joined', d => { if(d.alias===myState.alias) { myState.roomCode=d.roomCode; showLobby(); } renderLobby(d.players); });
+        socket.on('lobby_update', d => renderLobby(d.players));
+        
+        socket.on('game_start_exchange', d => {
+            myState.hand = d.hand; myState.phase = 'EXCHANGE';
+            showGame(); els.exchangeOverlay.classList.remove('hidden'); renderHand();
+        });
+        socket.on('exchange_wait', d => { els.exchangeText.innerHTML = "Esperando..."; });
+        socket.on('exchange_complete', d => {
+            myState.hand = d.newHand; els.exchangeOverlay.classList.add('hidden');
+            showSysMsg(`Recibiste: ${d.receivedCard.rank} ${d.receivedCard.suit}`); renderHand();
         });
 
-        socket.on('player_joined', data => {
-            if (data.alias === myState.alias) {
-                myState.roomCode = data.roomCode;
-                showLobby();
-            }
-            if (data.players) renderLobbyList(data.players);
-            showMsg(`${data.alias} entró.`);
-        });
+        socket.on('game_state_update', d => updateGameState(d));
+        socket.on('hand_update', d => { myState.hand = d.hand; renderHand(); });
+        socket.on('system_msg', d => showSysMsg(d.msg));
+        socket.on('error', d => { document.getElementById('errorMsg').innerText = d.msg; });
 
-        socket.on('lobby_update', data => renderLobbyList(data.players));
-
-        socket.on('game_start_exchange', data => {
-            myState.hand = data.hand;
-            myState.phase = 'EXCHANGE';
-            showGame();
-            els.exchangeOverlay.classList.remove('hidden');
-            els.handContainer.classList.remove('z-0');
-            els.handContainer.classList.add('z-[60]');
-            els.exchangeText.innerText = "Selecciona carta para pasar a la derecha.";
-            els.exchangeArrow.classList.remove('hidden');
-            renderHand();
-        });
-
-        socket.on('exchange_wait', data => {
-            els.exchangeText.innerHTML = `<span class="text-2xl animate-pulse">${data.msg}</span>`;
-            els.exchangeArrow.classList.add('hidden');
-            els.handContainer.classList.remove('z-[60]');
-            els.handContainer.classList.add('z-0');
-        });
-
-        socket.on('exchange_complete', data => {
-            myState.hand = data.newHand;
-            els.exchangeOverlay.classList.add('hidden');
-            els.handContainer.classList.remove('z-[60]');
-            els.handContainer.classList.add('z-0');
-            showMsg(`Recibiste: ${translateRank(data.receivedCard.rank)} de ${data.receivedCard.suit}`);
-            renderHand();
-        });
-
-        socket.on('game_state_update', data => updateGameState(data));
-        socket.on('hand_update', data => { myState.hand = data.hand; renderHand(); });
-        socket.on('system_msg', data => showMsg(data.msg));
-        socket.on('error', data => {
-            els.error.innerText = data.msg;
-            const btn = document.getElementById('btnJoin');
-            if(btn) { btn.disabled = false; btn.innerText = "Entrar"; }
-            setTimeout(() => els.error.innerText = '', 3000);
-        });
-
-        // LOGIC
-        function createRoom() {
-            const alias = document.getElementById('aliasInput').value;
-            if(!alias) return;
-            socket.emit('create_room', { alias });
-        }
-        function joinRoom() {
-            const alias = document.getElementById('aliasInput').value;
-            const code = document.getElementById('roomCodeInput').value;
-            if(!alias || !code) return;
-            const btn = document.getElementById('btnJoin');
-            btn.disabled = true;
-            btn.innerText = "Entrando...";
-            myState.alias = alias;
-            socket.emit('join_room', { alias, roomCode: code });
-        }
-        function startGame() { socket.emit('start_game_request', { roomCode: myState.roomCode }); }
-
+        // --- GAME LOGIC ---
         function updateGameState(data) {
             myState.phase = data.phase;
             const amIActive = (data.activePlayerId === socket.id);
             document.getElementById('deckCount').innerText = data.deckCount;
             
-            // Render Descarte
-            const discardEl = els.discard;
-            discardEl.innerHTML = '';
-            if (data.topCard) {
-                discardEl.appendChild(createCardEl(data.topCard, false));
-                if (data.phase === 'OFFER') discardEl.firstElementChild.classList.add('glow-card');
+            // Render Mesa (Carta Activa)
+            els.table.innerHTML = '';
+            if (data.currentCard) {
+                const c = createCardEl(data.currentCard, false);
+                if (data.phase === 'OFFER') c.classList.add('glow-card');
+                els.table.appendChild(c);
             } else {
-                discardEl.innerHTML = '<span class="text-white/30 text-xs">Vacío</span>';
+                els.table.innerHTML = '<span class="text-white/30 text-xs">Vacío</span>';
             }
 
-            els.actions.classList.add('hidden');
-            els.handInstruction.innerText = "Tu Mano";
+            // Render Melds (Juegos bajados)
+            renderMelds(data.allMelds);
+
+            // Controles
+            els.offerBtns.classList.add('hidden');
+            els.meldBtn.classList.add('hidden');
+            document.getElementById('handInstruction').innerText = "Tu Mano";
 
             const activeName = amIActive ? "TI" : (data.activePlayerAlias || "Oponente");
-
+            
             if (data.phase === 'OFFER') {
-                if (amIActive) {
-                    els.status.innerText = "🔴 ¿QUIERES LA CARTA?";
-                    els.status.className = "bg-red-600 px-4 py-1 rounded-full text-sm font-bold animate-pulse";
-                    els.actions.classList.remove('hidden');
-                } else {
-                    els.status.innerText = `Esperando a ${activeName}...`;
-                    els.status.className = "bg-gray-700 px-4 py-1 rounded-full text-sm";
+                els.status.innerText = amIActive ? `🔴 ¿TE SIRVE?` : `Ofertando a ${activeName}...`;
+                els.status.className = amIActive ? "bg-red-600 px-4 py-1 rounded-full text-xs font-bold animate-pulse" : "bg-gray-700 px-4 py-1 rounded-full text-xs";
+                if(amIActive) els.offerBtns.classList.remove('hidden');
+            
+            } else if (data.phase === 'MELDING') {
+                els.status.innerText = amIActive ? `🟡 BAJA TU JUEGO` : `${activeName} está bajando...`;
+                if(amIActive) {
+                    els.meldBtn.classList.remove('hidden');
+                    document.getElementById('handInstruction').innerText = "Selecciona cartas para combinar";
                 }
+
             } else if (data.phase === 'DISCARDING') {
-                if (amIActive) {
-                    els.status.innerText = "🟢 DESCARTA UNA CARTA";
-                    els.status.className = "bg-green-600 px-4 py-1 rounded-full text-sm font-bold";
-                    els.handInstruction.innerText = "Selecciona carta para descartar";
-                } else {
-                    els.status.innerText = `${activeName} está jugando...`;
-                    els.status.className = "bg-gray-700 px-4 py-1 rounded-full text-sm";
-                }
+                els.status.innerText = amIActive ? `🟢 DESCARTA UNA` : `${activeName} descarta...`;
+                if(amIActive) document.getElementById('handInstruction').innerText = "Toca carta para descartar";
             }
-            myState.isMyTurn = amIActive;
         }
 
         function handleCardClick(cardId, element) {
             if (myState.phase === 'EXCHANGE') {
-                if (confirm("¿Pasar esta carta a la derecha?")) {
-                    if(element) element.style.opacity = '0.5';
-                    socket.emit('submit_exchange_card', { roomCode: myState.roomCode, cardId });
+                if(confirm("¿Pasar esta carta?")) socket.emit('submit_exchange_card', {roomCode: myState.roomCode, cardId});
+            } 
+            else if (myState.phase === 'MELDING') {
+                // Selección múltiple para bajar
+                if (myState.selectedCards.includes(cardId)) {
+                    myState.selectedCards = myState.selectedCards.filter(id => id !== cardId);
+                    element.classList.remove('selected-card');
+                } else {
+                    myState.selectedCards.push(cardId);
+                    element.classList.add('selected-card');
                 }
-            } else if (myState.phase === 'DISCARDING' && myState.isMyTurn) {
-                socket.emit('discard_card', { roomCode: myState.roomCode, cardId });
+            }
+            else if (myState.phase === 'DISCARDING') {
+                socket.emit('discard_card', {roomCode: myState.roomCode, cardId});
             }
         }
 
         function respondOffer(action) {
-            socket.emit('offer_response', { roomCode: myState.roomCode, action });
-            els.actions.classList.add('hidden');
+            socket.emit('offer_response', {roomCode: myState.roomCode, action});
+            els.offerBtns.classList.add('hidden');
+            if(action === 'take') myState.selectedCards = []; // Reset selección
         }
 
-        // RENDER HELPERS
-        function showLobby() {
-            els.login.classList.add('hidden');
-            els.lobby.classList.remove('hidden');
-            document.getElementById('lobbyCode').innerText = myState.roomCode;
+        function submitMeld() {
+            if(myState.selectedCards.length === 0) { alert("Selecciona al menos una carta de tu mano."); return; }
+            socket.emit('submit_meld', {roomCode: myState.roomCode, cardIds: myState.selectedCards});
+            myState.selectedCards = [];
         }
-        function renderLobbyList(players) {
-            if (!players) return;
-            els.lobbyList.innerHTML = players.map(p => 
-                `<li class="flex justify-between border-b border-gray-700 py-1">
-                    <span><i class="fas fa-user mr-2 text-yellow-500"></i>${p.alias} ${p.alias === myState.alias ? '(Tú)' : ''}</span>
-                    ${p.isHost ? '<span class="text-xs bg-yellow-600 px-1 rounded">HOST</span>' : ''}
-                </li>`
-            ).join('');
-            const me = players.find(p => p.alias === myState.alias);
-            if (me && me.isHost) {
-                myState.isHost = true;
-                els.hostControls.classList.remove('hidden');
-                document.getElementById('waitMsg').classList.add('hidden');
-            }
+
+        // --- RENDER ---
+        function renderLobby(players) {
+            if(!players) return;
+            document.getElementById('lobbyList').innerHTML = players.map(p => 
+                `<li class="flex justify-between border-b border-gray-700 py-1 text-sm">
+                    <span>${p.alias} ${p.alias===myState.alias?'(Tú)':''}</span>
+                    ${p.isHost?'<span class="text-[10px] bg-yellow-600 px-1 rounded">HOST</span>':''}
+                </li>`).join('');
+            if(players.find(p => p.alias===myState.alias)?.isHost) document.getElementById('hostControls').classList.remove('hidden');
         }
-        function showGame() {
-            els.lobby.classList.add('hidden');
-            els.game.classList.remove('hidden');
-            document.getElementById('gameRoomCode').innerText = myState.roomCode;
-        }
+
         function renderHand() {
             els.hand.innerHTML = '';
             myState.hand.forEach(card => {
                 const el = createCardEl(card, true);
-                if (myState.phase === 'EXCHANGE') el.classList.add('exchange-highlight', 'cursor-pointer');
+                if(myState.phase === 'EXCHANGE') el.classList.add('exchange-highlight');
+                if(myState.phase === 'MELDING' || myState.phase === 'DISCARDING') el.style.cursor = 'pointer';
                 el.onclick = () => handleCardClick(card.id, el);
                 els.hand.appendChild(el);
             });
         }
-        
-        // --- FUNCIÓN CORREGIDA PARA LAS IMÁGENES ---
+
+        function renderMelds(allMelds) {
+            els.meldsArea.innerHTML = '';
+            if(!allMelds) return;
+            for (const [pid, melds] of Object.entries(allMelds)) {
+                if(!melds || melds.length === 0) continue;
+                // Crear contenedor para este jugador
+                const div = document.createElement('div');
+                div.className = "bg-black/30 p-2 rounded flex gap-2 items-center";
+                melds.forEach(meld => {
+                    const group = document.createElement('div');
+                    group.className = "flex -space-x-4 bg-white/5 p-1 rounded";
+                    meld.forEach(card => {
+                        const c = createCardEl(card, false);
+                        c.className = "card w-10 h-14 bg-white rounded shadow border border-gray-300 flex items-center justify-center"; // Override tamaño
+                        c.innerHTML = `<img src="cards/${pad(card.rank)}-${card.suit.toLowerCase()}.png" class="w-full h-full object-contain">`;
+                        group.appendChild(c);
+                    });
+                    div.appendChild(group);
+                });
+                els.meldsArea.appendChild(div);
+            }
+        }
+
         function createCardEl(card, interactive) {
             const el = document.createElement('div');
-            
-            // 1. Convertir palo a minúsculas ('Oros' -> 'oros')
-            const suitLower = card.suit.toLowerCase();
-            
-            // 2. Rellenar con cero si es menor de 10 ('1' -> '01')
-            const rankPad = card.rank < 10 ? '0' + card.rank : card.rank;
-            
-            // 3. Construir ruta exacta: cards/01-oros.png
-            const imageSrc = `cards/${rankPad}-${suitLower}.png`;
-            
-            el.className = `card w-20 h-32 rounded-lg shadow-md bg-white relative flex items-center justify-center ${interactive ? 'cursor-pointer hover:border-yellow-400 border-2 border-transparent' : ''}`;
-            
-            el.innerHTML = `
-                <img src="${imageSrc}" class="w-full h-full object-contain rounded-lg" onerror="this.nextElementSibling.classList.remove('hidden'); this.style.display='none'">
-                
-                <!-- Fallback si la imagen no carga -->
-                <div class="hidden w-full h-full flex flex-col items-center justify-between p-1 rounded-lg ${getSuitColor(card.suit)}">
-                    <div class="font-bold leading-none">${translateRank(card.rank)}</div>
-                    <div class="text-2xl"><i class="${getSuitIcon(card.suit)}"></i></div>
-                    <div class="font-bold leading-none rotate-180">${translateRank(card.rank)}</div>
-                </div>
-            `;
+            const src = `cards/${pad(card.rank)}-${card.suit.toLowerCase()}.png`;
+            el.className = `card w-20 h-32 rounded-lg shadow-md bg-white relative flex items-center justify-center ${interactive?'hover:border-yellow-400 border-2 border-transparent':''}`;
+            el.innerHTML = `<img src="${src}" class="w-full h-full object-contain rounded-lg" onerror="this.parentElement.style.backgroundColor='red'">`;
             return el;
         }
-        
-        function showMsg(txt) {
-            if (!txt) return;
-            els.sysMsg.innerText = txt;
-            els.sysMsg.classList.remove('hidden');
-            els.sysMsg.parentElement.classList.remove('hidden');
-            clearTimeout(window.msgTimeout);
-            window.msgTimeout = setTimeout(() => els.sysMsg.classList.add('hidden'), 3000);
-        }
-        function translateRank(r) { return r===10?'S':r===11?'C':r===12?'R':r; }
-        function getSuitColor(s) { return s==='Oros'?'text-yellow-600':s==='Copas'?'text-red-600':s==='Espadas'?'text-blue-600':'text-green-700'; }
-        function getSuitIcon(s) { return s==='Oros'?'fas fa-sun':s==='Copas'?'fas fa-wine-glass':s==='Espadas'?'fas fa-khanda':'fas fa-tree'; }
+
+        // Helpers
+        function pad(n) { return n<10?'0'+n:n; }
+        function createRoom() { socket.emit('create_room', {alias: document.getElementById('aliasInput').value}); }
+        function joinRoom() { socket.emit('join_room', {alias: document.getElementById('aliasInput').value, roomCode: document.getElementById('roomCodeInput').value}); }
+        function startGame() { socket.emit('start_game_request', {roomCode: myState.roomCode}); }
+        function showLobby() { els.login.classList.add('hidden'); els.lobby.classList.remove('hidden'); document.getElementById('lobbyCode').innerText = myState.roomCode; }
+        function showGame() { els.lobby.classList.add('hidden'); els.game.classList.remove('hidden'); document.getElementById('gameRoomCode').innerText = myState.roomCode; }
+        function showSysMsg(txt) { els.sysMsg.innerText = txt; els.sysMsg.classList.remove('hidden'); setTimeout(()=>els.sysMsg.classList.add('hidden'),3000); }
     </script>
 </body>
 </html>
