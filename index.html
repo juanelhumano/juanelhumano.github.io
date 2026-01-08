@@ -3,420 +3,434 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SICAR Runner</title>
+    <title>PokerTv - Transmisión con Chat</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
         body {
-            font-family: 'Press Start 2P', cursive;
+            background-color: #0f172a;
+            color: #e2e8f0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            background: #000;
+            border-radius: 0.75rem;
             overflow: hidden;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
         }
-        .game-container {
-            touch-action: none;
+        /* Mantener aspect ratio 16:9 de forma responsiva */
+        .video-aspect {
+            padding-bottom: 56.25%; /* 16:9 */
+            position: relative;
+            height: 0;
         }
-        canvas {
-            background-color: #f7f7f7;
-            border-bottom: 2px solid #333;
+        video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Espejo por defecto */
         }
-        #commission-status {
-            transition: color 0.3s ease-in-out;
+        .viewer-mode video {
+            transform: scaleX(1); /* Sin espejo para espectador */
+        }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        /* Scrollbar del chat */
+        .chat-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .chat-scroll::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.1);
+        }
+        .chat-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
         }
     </style>
 </head>
-<body class="bg-gray-800 text-white flex items-center justify-center h-screen m-0">
+<body class="min-h-screen flex flex-col p-4 md:p-6">
 
-    <div id="game-container" class="game-container w-full max-w-4xl text-center p-4">
-        <h1 class="text-4xl md:text-5xl mb-2">SICAR Runner</h1>
-        
-        <div class="flex justify-between items-center text-lg md:text-2xl mb-4 px-2">
-            <div>
-                <div>COMISIONES: <span id="score">0</span></div>
-                <div id="commission-status" class="text-base mt-1">No comisiona</div>
+    <!-- Header (Solo visible en setup) -->
+    <header id="main-header" class="mb-8 text-center transition-all duration-500">
+        <div class="flex items-center justify-center gap-2 mb-2">
+            <i data-lucide="radio" class="w-8 h-8 text-red-500"></i>
+            <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">PokerTv</h1>
+        </div>
+        <p class="text-slate-400">Transmite en vivo y chatea.</p>
+    </header>
+
+    <!-- Contenedor Central para Setup -->
+    <main class="flex-1 flex flex-col items-center justify-center w-full max-w-6xl mx-auto">
+
+        <!-- 1. Configuración Inicial -->
+        <div id="config-panel" class="w-full max-w-md glass-panel p-6 rounded-xl mb-6 shadow-xl">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-slate-300 mb-2">Servidor</label>
+                <input type="text" id="server-url" value="https://webstream-aark.onrender.com" readonly
+                    class="w-full bg-slate-800/50 border border-slate-600 rounded-lg px-4 py-2 text-slate-400 cursor-not-allowed">
+                <p class="text-xs text-green-400 mt-2 flex items-center gap-1">
+                    <i data-lucide="check-circle" class="w-3 h-3"></i> Listo para conectar
+                </p>
             </div>
-            <div>HI: <span id="high-score">0</span></div>
+            <button onclick="initializeSocket()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-all flex items-center justify-center gap-2">
+                <i data-lucide="plug"></i> Conectar
+            </button>
         </div>
 
-        <div class="relative w-full aspect-[2/1] bg-white rounded-lg shadow-2xl overflow-hidden">
-            <canvas id="gameCanvas"></canvas>
-            <div id="start-screen" class="absolute inset-0 bg-black bg-opacity-60 flex flex-col items-center justify-center p-4">
-                <p class="text-2xl md:text-4xl mb-4">¡Prepárate para correr!</p>
-                <p class="text-lg md:text-xl mb-8">Presiona ESPACIO o toca la pantalla para saltar</p>
-                <button id="start-button" class="bg-green-500 text-white font-bold py-3 px-8 rounded-lg text-2xl hover:bg-green-600 transition-colors duration-300">
-                    Iniciar Juego
+        <!-- 2. Selección de Rol -->
+        <div id="role-selection" class="hidden w-full max-w-2xl grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
+            <div class="glass-panel p-6 rounded-xl hover:border-blue-500 transition-all cursor-pointer group" onclick="selectRole('broadcaster')">
+                <div class="h-12 w-12 bg-blue-500/20 rounded-full flex items-center justify-center mb-4 group-hover:bg-blue-500/40 transition-colors">
+                    <i data-lucide="video" class="text-blue-400 w-6 h-6"></i>
+                </div>
+                <h2 class="text-xl font-bold text-white mb-2">Transmitir</h2>
+                <p class="text-slate-400 text-sm">Crea una sala y comparte tu cámara.</p>
+            </div>
+            <div class="glass-panel p-6 rounded-xl hover:border-purple-500 transition-all cursor-pointer group" onclick="selectRole('viewer')">
+                <div class="h-12 w-12 bg-purple-500/20 rounded-full flex items-center justify-center mb-4 group-hover:bg-purple-500/40 transition-colors">
+                    <i data-lucide="eye" class="text-purple-400 w-6 h-6"></i>
+                </div>
+                <h2 class="text-xl font-bold text-white mb-2">Espectar</h2>
+                <p class="text-slate-400 text-sm">Únete a una sala existente.</p>
+            </div>
+        </div>
+
+        <!-- 3. Formulario para unirse (Solo Viewer) -->
+        <div id="join-form" class="hidden w-full max-w-md glass-panel p-6 rounded-xl animate-fade-in">
+            <h3 class="text-lg font-bold mb-4 flex items-center gap-2"><i data-lucide="log-in"></i> Unirse a Sala</h3>
+            <div class="flex gap-2">
+                <input type="text" id="room-input" placeholder="ID de Sala (ej. 123456)" class="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500">
+                <button onclick="joinRoom()" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Entrar</button>
+            </div>
+            <button onclick="location.reload()" class="mt-4 text-xs text-slate-500 hover:text-slate-300 underline">Volver</button>
+        </div>
+
+    </main>
+
+    <!-- 4. LIVE ROOM (Layout Video + Chat) -->
+    <div id="live-room" class="hidden fixed inset-0 z-50 bg-[#0f172a] flex flex-col md:flex-row overflow-hidden">
+        
+        <!-- Área Izquierda: Video -->
+        <div class="flex-1 flex flex-col relative bg-black">
+            <!-- Top Bar del Video -->
+            <div class="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-black/80 to-transparent flex justify-between items-start pointer-events-none">
+                <div class="pointer-events-auto bg-red-600/90 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 animate-pulse">
+                    <span class="w-2 h-2 bg-white rounded-full"></span> LIVE
+                </div>
+                <div class="pointer-events-auto bg-slate-900/80 backdrop-blur text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700/50 flex items-center gap-2 shadow-lg">
+                    <span class="text-xs uppercase tracking-wider text-slate-400">Sala ID</span>
+                    <span id="room-id-display" class="font-mono font-bold select-all text-white">...</span>
+                    <button onclick="copyRoomId()" class="hover:text-blue-400 transition-colors" title="Copiar"><i data-lucide="copy" class="w-3 h-3"></i></button>
+                </div>
+            </div>
+
+            <!-- Contenedor Video -->
+            <div class="flex-1 flex items-center justify-center w-full h-full relative" id="video-area">
+                <video id="main-video" autoplay playsinline muted class="w-full h-full object-contain bg-slate-900"></video>
+                
+                <!-- Mensaje de espera para espectador -->
+                <div id="waiting-msg" class="hidden absolute inset-0 flex items-center justify-center bg-black/80 z-10 flex-col">
+                     <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mb-4"></div>
+                     <p class="text-slate-300">Esperando conexión...</p>
+                </div>
+
+                <!-- Controles Flotantes (Solo Broadcaster) -->
+                <div id="broadcaster-controls" class="hidden absolute bottom-8 left-1/2 transform -translate-x-1/2 flex gap-4 bg-slate-900/80 backdrop-blur px-6 py-3 rounded-full border border-slate-700/50 shadow-2xl transition-all hover:bg-slate-900 z-30">
+                    <button onclick="toggleMute()" id="mute-btn" class="p-3 rounded-full bg-slate-700 hover:bg-slate-600 text-white transition-colors"><i data-lucide="mic"></i></button>
+                    <button onclick="toggleVideo()" id="video-btn" class="p-3 rounded-full bg-slate-700 hover:bg-slate-600 text-white transition-colors"><i data-lucide="video"></i></button>
+                    <button onclick="location.reload()" class="p-3 rounded-full bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/50 transition-colors"><i data-lucide="phone-off"></i></button>
+                </div>
+
+                <!-- Botón Salir (Solo Viewer) -->
+                <button id="viewer-exit-btn" onclick="location.reload()" class="hidden absolute bottom-8 right-8 bg-slate-800/80 hover:bg-red-600 text-white px-4 py-2 rounded-lg backdrop-blur transition-all flex items-center gap-2 z-30">
+                    <i data-lucide="log-out" class="w-4 h-4"></i> Salir
                 </button>
             </div>
-            <div id="game-over-screen" class="absolute inset-0 bg-black bg-opacity-60 flex-col items-center justify-center p-4 hidden">
-                <p class="text-4xl md:text-6xl mb-4">GAME OVER</p>
-                <button id="restart-button" class="bg-blue-500 text-white font-bold py-3 px-8 rounded-lg text-2xl hover:bg-blue-600 transition-colors duration-300">
-                    Reiniciar
-                </button>
+        </div>
+
+        <!-- Área Derecha: Chat -->
+        <div class="w-full md:w-80 lg:w-96 bg-slate-900 border-t md:border-t-0 md:border-l border-slate-700 flex flex-col h-[40vh] md:h-full z-40 shadow-xl">
+            <div class="p-4 border-b border-slate-700 bg-slate-800/50 flex items-center justify-between">
+                <h3 class="font-bold text-slate-200 flex items-center gap-2">
+                    <i data-lucide="message-square" class="w-4 h-4 text-blue-400"></i> Chat en vivo
+                </h3>
             </div>
+            
+            <!-- Lista de Mensajes -->
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3 chat-scroll bg-slate-900">
+                <div class="text-center text-xs text-slate-500 my-4">--- Inicio del Chat ---</div>
+            </div>
+
+            <!-- Input -->
+            <form id="chat-form" class="p-3 bg-slate-800 border-t border-slate-700 flex gap-2">
+                <input type="text" id="chat-input" placeholder="Escribe un mensaje..." autocomplete="off"
+                    class="flex-1 bg-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 border border-slate-600 focus:outline-none focus:border-blue-500 focus:bg-slate-600 transition-colors">
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg transition-colors">
+                    <i data-lucide="send" class="w-4 h-4"></i>
+                </button>
+            </form>
         </div>
     </div>
 
     <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const scoreEl = document.getElementById('score');
-        const highScoreEl = document.getElementById('high-score');
-        const commissionStatusEl = document.getElementById('commission-status'); // Nuevo elemento
-        const startScreen = document.getElementById('start-screen');
-        const gameOverScreen = document.getElementById('game-over-screen');
-        const startButton = document.getElementById('start-button');
-        const restartButton = document.getElementById('restart-button');
+        lucide.createIcons();
 
-        // --- Image Assets ---
-        const imageUrls = {
-            playerRun1: 'correr.png',
-            playerRun2: 'correr2.png',
-            playerJump: 'jump.png',
+        let socket;
+        let localStream;
+        let peerConnection;
+        let currentRoomId;
+        let currentRole; // 'broadcaster' or 'viewer'
+
+        // Configuración STUN
+        const servers = {
+            iceServers: [
+                { urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }
+            ]
         };
 
-        const obstacleData = [
-            { src: 'Bascula-SICAR-Mary3W_02.jpg', points: 13 },
-            { src: 'Etiquetadora-Dora88s-B-trans.png', points: 13 },
-            { src: 'Etiquetadora-EVA-Black-58-2.png', points: 13 },
-            { src: 'Etiquetadora-QL800-2.jpg', points: 13 },
-            { src: 'Imp-SICAR-WL88S-F.png', points: 13 },
-            { src: 'SICAR-AndyD2-1.png', points: 13 },
-            { src: 'Sicar-Hammbox-4-1.png', points: 13 },
-            { src: 'comandero.JPG', points: 22 },
-            { src: 'migra.PNG', points: 19 },
-            { src: 'repo.PNG', points: 19 },
-            { src: 'sellos.JPG', points: 5 },
-            { src: 'sicar-movil.JPG', points: 5 },
-            { src: 'correo.JPG', points: 5 },
-	        { src: 'nube.PNG', points: 15 }
-        ];
-
-        const images = {};
-        let imagesLoaded = 0;
-        const totalImages = 3 + obstacleData.length;
-
-        function loadImages(callback) {
-            function onImageLoad() {
-                imagesLoaded++;
-                if (imagesLoaded === totalImages) {
-                    callback();
-                }
-            }
+        // --- INICIO ---
+        function initializeSocket() {
+            const url = document.getElementById('server-url').value;
+            if (!url) return alert("URL requerida");
             
-            images.playerRun1 = new Image();
-            images.playerRun1.src = imageUrls.playerRun1;
-            images.playerRun1.onload = onImageLoad;
-            images.playerRun1.onerror = () => { onImageLoad(); console.log(`Error loading ${imageUrls.playerRun1}`); };
+            const btn = document.querySelector('#config-panel button');
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = 'Conectando...';
+            btn.disabled = true;
 
-            images.playerRun2 = new Image();
-            images.playerRun2.src = imageUrls.playerRun2;
-            images.playerRun2.onload = onImageLoad;
-            images.playerRun2.onerror = () => { onImageLoad(); console.log(`Error loading ${imageUrls.playerRun2}`); };
-            
-            images.playerJump = new Image();
-            images.playerJump.src = imageUrls.playerJump;
-            images.playerJump.onload = onImageLoad;
-            images.playerJump.onerror = () => { onImageLoad(); console.log(`Error loading ${imageUrls.playerJump}`); };
-
-            images.obstacles = [];
-            obstacleData.forEach(data => {
-                const img = new Image();
-                img.src = data.src;
-                img.onload = onImageLoad;
-                img.onerror = () => { onImageLoad(); console.log(`Error loading ${data.src}`); };
-                images.obstacles.push({ image: img, points: data.points });
-            });
-        }
-        
-        // --- Game Variables ---
-        let player, gravity, obstacles, gameSpeed, score, highScore, gameOver, spawnTimer;
-        let groundHeight;
-        let animationFrameId;
-        let runFrame = 0;
-        let floatingScores = [];
-
-        // --- Game Setup ---
-        function resizeCanvas() {
-            const container = canvas.parentElement;
-            canvas.width = container.clientWidth;
-            canvas.height = container.clientHeight;
-            groundHeight = canvas.height - 70;
-        }
-
-        function init() {
-            resizeCanvas();
-            
-            gravity = 0.7;
-            obstacles = [];
-            floatingScores = [];
-            gameSpeed = 5;
-            score = 0;
-            highScore = localStorage.getItem('sicarRunnerHighScore') || 0;
-            
-            scoreEl.innerText = 0;
-            highScoreEl.innerText = highScore;
-            commissionStatusEl.innerText = 'No comisiona';
-            commissionStatusEl.style.color = '#facc15'; // Tailwind yellow-400
-
-            gameOver = false;
-            spawnTimer = 100;
-        }
-
-        // --- Player ---
-        class Player {
-            constructor(x, y, width, height) {
-                this.x = x;
-                this.y = y;
-                this.width = width;
-                this.height = height;
-                this.dy = 0;
-                this.jumpPower = 15;
-                this.grounded = true;
-            }
-
-            draw(ctx) {
-                let currentImage;
-                if (!this.grounded) {
-                    currentImage = images.playerJump;
-                } else {
-                    currentImage = runFrame < 10 ? images.playerRun1 : images.playerRun2;
-                }
+            try {
+                socket = io(url);
                 
-                if (currentImage && currentImage.complete && currentImage.naturalHeight !== 0) {
-                     ctx.drawImage(currentImage, this.x, this.y, this.width, this.height);
-                } else {
-                    ctx.fillStyle = 'blue';
-                    ctx.fillRect(this.x, this.y, this.width, this.height);
-                }
-            }
+                socket.on('connect', () => {
+                    document.getElementById('config-panel').classList.add('hidden');
+                    document.getElementById('main-header').classList.add('hidden'); // Ocultar header para limpiar vista
+                    document.getElementById('role-selection').classList.remove('hidden');
+                });
 
-            update() {
-                runFrame = (runFrame + 1) % 20;
+                socket.on('connect_error', (err) => {
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                    alert("Error conexión: " + err.message);
+                });
 
-                if (!this.grounded) {
-                    this.dy += gravity;
-                    this.y += this.dy;
-                }
+                setupSocketListeners();
 
-                if (this.y + this.height >= groundHeight) {
-                    this.y = groundHeight - this.height;
-                    this.dy = 0;
-                    this.grounded = true;
-                }
-            }
-
-            jump() {
-                if (this.grounded) {
-                    this.dy = -this.jumpPower;
-                    this.grounded = false;
-                }
-            }
-        }
-        
-        // --- Floating Score Effect ---
-        class FloatingScore {
-            constructor(x, y, value) {
-                this.x = x;
-                this.y = y;
-                this.value = value;
-                this.opacity = 1;
-                this.lifespan = 60;
-            }
-
-            update() {
-                this.y -= 0.8;
-                this.lifespan--;
-                this.opacity = this.lifespan / 60;
-            }
-
-            draw(ctx) {
-                ctx.save();
-                ctx.globalAlpha = this.opacity;
-                ctx.fillStyle = '#1f2937';
-                ctx.font = '20px "Press Start 2P"';
-                ctx.fillText(this.value, this.x, this.y);
-                ctx.restore();
+            } catch (e) {
+                alert("Error URL");
+                btn.disabled = false;
             }
         }
 
-        // --- Obstacles ---
-        class Obstacle {
-            constructor(x, y, width, height, image, points) {
-                this.x = x;
-                this.y = y;
-                this.width = width;
-                this.height = height;
-                this.image = image;
-                this.points = points;
-                this.passed = false;
-            }
-
-            draw(ctx) {
-                 if (this.image && this.image.complete && this.image.naturalHeight !== 0) {
-                    ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
-                } else {
-                    ctx.fillStyle = 'red';
-                    ctx.fillRect(this.x, this.y, this.width, this.height);
-                }
-            }
-
-            update() {
-                this.x -= gameSpeed;
-            }
-        }
-        
-        function spawnObstacle() {
-            spawnTimer--;
-            if (spawnTimer <= 0) {
-                const randomObstacleData = images.obstacles[Math.floor(Math.random() * images.obstacles.length)];
-                const randomImage = randomObstacleData.image;
-                const points = randomObstacleData.points;
-                
-                const scale = 0.8 + Math.random() * 0.4;
-                const baseHeight = 50;
-                const height = baseHeight * scale;
-                const width = (randomImage.naturalWidth > 0) ? (randomImage.width / randomImage.height) * height : 50;
-
-                const newObstacle = new Obstacle(
-                    canvas.width, 
-                    groundHeight - height, 
-                    width, 
-                    height, 
-                    randomImage,
-                    points
-                );
-                obstacles.push(newObstacle);
-
-                spawnTimer = 100 - gameSpeed * 4 - Math.random() * 40;
-                if(spawnTimer < 40) spawnTimer = 40;
-            }
-        }
-
-        function checkCollision(player, obstacle) {
-            const padding = 5;
-            return (
-                player.x + padding < obstacle.x + obstacle.width - padding &&
-                player.x + player.width - padding > obstacle.x + padding &&
-                player.y + padding < obstacle.y + obstacle.height - padding &&
-                player.y + player.height - padding > obstacle.y + padding
-            );
-        }
-
-        // --- Game Loop ---
-        function animate() {
-            if (gameOver) return;
-
-            animationFrameId = requestAnimationFrame(animate);
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            player.update();
-            player.draw(ctx);
+        function setupSocketListeners() {
+            // Chat Listener Global
+            socket.on('receive-chat-message', (data) => {
+                appendMessage(data.user, data.text, false);
+            });
             
-            spawnObstacle();
-            obstacles.forEach((obstacle, index) => {
-                obstacle.update();
-                obstacle.draw(ctx);
-
-                if (!obstacle.passed && obstacle.x + obstacle.width < player.x) {
-                    const points = obstacle.points;
-                    score += points;
-                    floatingScores.push(new FloatingScore(player.x, player.y, `+${points}`));
-                    obstacle.passed = true;
-                }
-
-                if (checkCollision(player, obstacle)) {
-                    endGame();
-                }
-
-                if (obstacle.x + obstacle.width < 0) {
-                    obstacles.splice(index, 1);
+            // WebRTC Listeners
+            socket.on('offer', handleOffer);
+            socket.on('answer', handleAnswer);
+            socket.on('ice-candidate', handleCandidate);
+            socket.on('user-connected', (userId) => {
+                if(currentRole === 'broadcaster') {
+                    appendSystemMessage("Un espectador se ha unido.");
+                    createOffer(userId);
                 }
             });
-
-            floatingScores.forEach((fs, index) => {
-                fs.update();
-                fs.draw(ctx);
-                if (fs.opacity <= 0) {
-                    floatingScores.splice(index, 1);
+            socket.on('user-disconnected', () => {
+                if (currentRole === 'viewer') {
+                    alert("El streamer terminó la transmisión.");
+                    location.reload();
+                } else {
+                    appendSystemMessage("Un espectador ha salido.");
                 }
             });
+        }
 
-            // --- LÓGICA DE PUNTUACIÓN MODIFICADA ---
-            // Siempre muestra el puntaje numérico
-            scoreEl.innerText = Math.floor(score);
-
-            // Actualiza la leyenda y su color según el puntaje
-            if (score < 3000) {
-                commissionStatusEl.innerText = 'No comisiona';
-                commissionStatusEl.style.color = '#facc15'; // Amarillo
+        // --- LÓGICA DE UI ---
+        function selectRole(role) {
+            currentRole = role;
+            document.getElementById('role-selection').classList.add('hidden');
+            
+            if (role === 'broadcaster') {
+                startBroadcasting();
             } else {
-                commissionStatusEl.innerText = '¡Comisiona!';
-                commissionStatusEl.style.color = '#4ade80'; // Verde
-            }
-            // --- FIN DE LA MODIFICACIÓN ---
-
-            if (score > 0 && Math.floor(score) % 200 === 0) {
-                gameSpeed += 0.1;
+                document.getElementById('join-form').classList.remove('hidden');
             }
         }
-        
-        // --- Game State ---
-        function startGame() {
-            cancelAnimationFrame(animationFrameId);
-            startScreen.classList.add('hidden');
-            gameOverScreen.classList.add('hidden');
+
+        function enterLiveRoom() {
+            document.getElementById('live-room').classList.remove('hidden');
+            document.getElementById('main-header').style.display = 'none'; // Asegurar que header se vaya
+            lucide.createIcons();
             
-            init();
-            player = new Player(50, groundHeight - 60, 50, 60);
+            // Ajustar UI según rol
+            if (currentRole === 'broadcaster') {
+                document.getElementById('broadcaster-controls').classList.remove('hidden');
+                document.getElementById('main-video').muted = true; // Streamer se mutea a sí mismo localmente
+            } else {
+                document.getElementById('video-area').classList.add('viewer-mode');
+                document.getElementById('viewer-exit-btn').classList.remove('hidden');
+                document.getElementById('waiting-msg').classList.remove('hidden');
+            }
+        }
+
+        // --- BROADCASTER ---
+        async function startBroadcasting() {
+            currentRoomId = Math.floor(100000 + Math.random() * 900000).toString();
+            document.getElementById('room-id-display').innerText = currentRoomId;
             
-            animate();
-        }
+            enterLiveRoom();
 
-        function endGame() {
-            gameOver = true;
-            cancelAnimationFrame(animationFrameId);
-            gameOverScreen.classList.remove('hidden');
-
-            if (score > highScore) {
-                highScore = Math.floor(score);
-                localStorage.setItem('sicarRunnerHighScore', highScore);
-                highScoreEl.innerText = highScore;
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById('main-video').srcObject = localStream;
+                socket.emit('join-room', currentRoomId, socket.id);
+                appendSystemMessage(`Sala creada. ID: ${currentRoomId}`);
+            } catch (err) {
+                alert("Error cámara/micro: " + err.message);
+                location.reload();
             }
         }
 
-        // --- Event Listeners ---
-        window.addEventListener('resize', () => {
-             resizeCanvas();
-             if (!animationFrameId) {
-                init();
-             }
-        });
-        
-        startButton.addEventListener('click', startGame);
-        restartButton.addEventListener('click', startGame);
+        // --- VIEWER ---
+        function joinRoom() {
+            const id = document.getElementById('room-input').value;
+            if(!id) return alert("Ingresa ID");
+            currentRoomId = id;
+            document.getElementById('room-id-display').innerText = currentRoomId;
+            document.getElementById('join-form').classList.add('hidden');
+            
+            enterLiveRoom();
+            socket.emit('join-room', currentRoomId, socket.id);
+            appendSystemMessage("Te has unido a la sala.");
+        }
 
-        document.addEventListener('keydown', e => {
-            if (e.code === 'Space' || e.key === ' ' || e.code === 'ArrowUp') {
-                e.preventDefault();
-                if(!gameOver && player) player.jump();
-            }
-        });
-        
-        canvas.parentElement.addEventListener('mousedown', () => {
-             if(!gameOver && player) player.jump();
-        });
-        
-        canvas.parentElement.addEventListener('touchstart', (e) => {
+        // --- WEBRTC ---
+        async function createOffer(targetUserId) {
+            peerConnection = new RTCPeerConnection(servers);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            
+            peerConnection.onicecandidate = event => {
+                if(event.candidate) socket.emit('ice-candidate', { target: targetUserId, candidate: event.candidate });
+            };
+
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            
+            socket.emit('offer', { target: targetUserId, caller: socket.id, sdp: peerConnection.localDescription });
+        }
+
+        async function handleOffer(payload) {
+            if(currentRole !== 'viewer') return; // Solo viewer recibe ofertas del streamer
+
+            peerConnection = new RTCPeerConnection(servers);
+            
+            peerConnection.ontrack = event => {
+                document.getElementById('main-video').srcObject = event.streams[0];
+                document.getElementById('waiting-msg').classList.add('hidden');
+            };
+
+            peerConnection.onicecandidate = event => {
+                if(event.candidate) socket.emit('ice-candidate', { target: payload.caller, candidate: event.candidate });
+            };
+
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+
+            socket.emit('answer', { target: payload.caller, caller: socket.id, sdp: peerConnection.localDescription });
+        }
+
+        function handleAnswer(payload) {
+            if(peerConnection) peerConnection.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+        }
+
+        function handleCandidate(candidate) {
+            if(peerConnection) peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+
+        // --- CHAT SYSTEM ---
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        const chatBox = document.getElementById('chat-messages');
+
+        chatForm.addEventListener('submit', (e) => {
             e.preventDefault();
-            if(!gameOver && player) player.jump();
+            const text = chatInput.value.trim();
+            if(!text) return;
+
+            const userLabel = currentRole === 'broadcaster' ? 'Streamer' : 'Espectador';
+            
+            // Enviar al server
+            socket.emit('send-chat-message', currentRoomId, { user: userLabel, text: text });
+            
+            // Mostrar localmente
+            appendMessage('Tú', text, true);
+            chatInput.value = '';
         });
 
-        // --- Initial Load ---
-        loadImages(() => {
-            console.log("All images loaded, game is ready.");
-            init();
-            player = new Player(50, groundHeight - 60, 50, 60);
-            player.draw(ctx);
-        });
+        function appendMessage(user, text, isMe) {
+            const div = document.createElement('div');
+            const alignClass = isMe ? 'items-end' : 'items-start';
+            const bgClass = isMe ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-200';
+            const roundedClass = isMe ? 'rounded-l-lg rounded-tr-lg' : 'rounded-r-lg rounded-tl-lg';
+            
+            // Icono según rol (visual)
+            let icon = '';
+            if(user === 'Streamer') icon = '<i data-lucide="video" class="w-3 h-3 inline mr-1"></i>';
+            if(user === 'Espectador') icon = '<i data-lucide="eye" class="w-3 h-3 inline mr-1"></i>';
 
+            div.className = `flex flex-col ${alignClass} mb-2 animate-fade-in`;
+            div.innerHTML = `
+                <span class="text-[10px] text-slate-400 mb-0.5 px-1">${icon}${user}</span>
+                <div class="${bgClass} ${roundedClass} px-3 py-2 max-w-[85%] text-sm break-words shadow-sm">
+                    ${text}
+                </div>
+            `;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            if(!isMe) lucide.createIcons(); // Re-render icons for new msg
+        }
+
+        function appendSystemMessage(text) {
+            const div = document.createElement('div');
+            div.className = "text-center my-2";
+            div.innerHTML = `<span class="text-xs bg-slate-800/50 text-slate-500 px-2 py-1 rounded-full border border-slate-700/50">${text}</span>`;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // --- CONTROLES EXTRA ---
+        function copyRoomId() {
+            navigator.clipboard.writeText(currentRoomId);
+            appendSystemMessage("ID copiado al portapapeles");
+        }
+        function toggleMute() {
+            const audioTrack = localStream.getAudioTracks()[0];
+            audioTrack.enabled = !audioTrack.enabled;
+            const btn = document.getElementById('mute-btn');
+            btn.className = `p-3 rounded-full transition-colors ${audioTrack.enabled ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-red-500 text-white'}`;
+            btn.innerHTML = audioTrack.enabled ? '<i data-lucide="mic"></i>' : '<i data-lucide="mic-off"></i>';
+            lucide.createIcons();
+        }
+        function toggleVideo() {
+            const videoTrack = localStream.getVideoTracks()[0];
+            videoTrack.enabled = !videoTrack.enabled;
+            const btn = document.getElementById('video-btn');
+             btn.className = `p-3 rounded-full transition-colors ${videoTrack.enabled ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-red-500 text-white'}`;
+            btn.innerHTML = videoTrack.enabled ? '<i data-lucide="video"></i>' : '<i data-lucide="video-off"></i>';
+            lucide.createIcons();
+        }
     </script>
 </body>
 </html>
