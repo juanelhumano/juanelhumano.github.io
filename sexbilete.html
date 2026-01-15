@@ -32,6 +32,20 @@
         /* Animación suave para el modal */
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .modal-animate { animation: fadeIn 0.3s ease-out; }
+
+        /* Estilo para los dados mini en el historial */
+        .mini-die {
+            font-size: 0.8rem;
+            width: 1.5rem;
+            height: 1.5rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            border-radius: 4px;
+            margin-right: 2px;
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
     </style>
 </head>
 <body class="felt-bg text-white h-screen flex flex-col items-center justify-center p-4">
@@ -87,12 +101,15 @@
     </div>
 
     <!-- PANTALLA DE JUEGO -->
-    <div id="game-screen" class="hidden w-full max-w-4xl flex flex-col items-center z-0">
+    <div id="game-screen" class="hidden w-full max-w-4xl flex flex-col items-center z-0 relative h-full justify-center">
+        
+        <!-- INFO TURNO -->
         <div class="bg-black/40 p-4 rounded-lg mb-8 text-center backdrop-blur-sm w-full max-w-2xl">
             <h2 id="turn-info" class="text-2xl text-yellow-300 font-bold mb-1">Turno de: ???</h2>
             <p class="text-sm text-gray-200">Tiradas restantes: <span id="rolls-left" class="font-bold text-white text-xl">3</span></p>
         </div>
 
+        <!-- DADOS -->
         <div class="flex flex-wrap justify-center gap-4 mb-10 perspective-1000">
             <div id="die-0" onclick="toggleHold(0)" class="die w-20 h-20 bg-white rounded-xl flex items-center justify-center text-4xl text-black font-bold border-b-4 border-gray-300">?</div>
             <div id="die-1" onclick="toggleHold(1)" class="die w-20 h-20 bg-white rounded-xl flex items-center justify-center text-4xl text-black font-bold border-b-4 border-gray-300">?</div>
@@ -101,6 +118,7 @@
             <div id="die-4" onclick="toggleHold(4)" class="die w-20 h-20 bg-white rounded-xl flex items-center justify-center text-4xl text-black font-bold border-b-4 border-gray-300">?</div>
         </div>
 
+        <!-- CONTROLES -->
         <div id="player-controls" class="flex gap-4 hidden">
             <button onclick="rollDice()" class="bg-yellow-500 hover:bg-yellow-600 text-black px-8 py-4 rounded-full font-bold text-xl shadow-lg transform transition active:scale-95">
                 LANZAR 🎲
@@ -111,7 +129,16 @@
         </div>
         <p id="wait-controls-msg" class="text-gray-300 italic text-xl animate-pulse">Esperando jugada...</p>
         
+        <!-- LOG DEL JUEGO -->
         <div id="game-log" class="mt-8 text-sm text-gray-300 h-24 overflow-y-auto w-full text-center max-w-xl bg-black/20 rounded p-2"></div>
+
+        <!-- HISTORIAL DE JUGADAS (Mini Tablita) -->
+        <div class="absolute bottom-4 left-4 bg-black/60 p-3 rounded-lg backdrop-blur-md border border-white/10 w-64 hidden" id="round-history-container">
+            <h3 class="text-xs text-gray-400 font-bold uppercase mb-2 border-b border-gray-600 pb-1">Resultados Ronda Actual</h3>
+            <ul id="round-history" class="space-y-2 text-sm">
+                <!-- Aquí se inyectan las jugadas pasadas -->
+            </ul>
+        </div>
     </div>
 
     <!-- MODAL DE RESULTADOS -->
@@ -175,17 +202,12 @@
             socket.on('dice_rolled', handleDiceUpdate);
             socket.on('turn_change', handleTurnChange);
             socket.on('game_over', handleGameOver);
-            // ESCUCHAMOS EL EVENTO DE NUEVO ANFITRIÓN
             socket.on('host_promoted', () => {
                 iAmHost = true;
-                // Si estamos en la sala de espera
                 document.getElementById('host-controls').classList.remove('hidden');
                 document.getElementById('waiting-msg').classList.add('hidden');
-                
-                // Si estamos en la pantalla de resultados (fin de juego)
                 document.getElementById('host-restart-controls').classList.remove('hidden');
                 document.getElementById('waiting-restart-msg').classList.add('hidden');
-                
                 showToast("👑 ¡Ahora eres el anfitrión!");
             });
 
@@ -249,9 +271,13 @@
 
         function handleGameStart(data) {
             document.getElementById('waiting-screen').classList.add('hidden');
-            document.getElementById('results-modal').classList.add('hidden'); // Ocultar resultados si estaban
+            document.getElementById('results-modal').classList.add('hidden');
             document.getElementById('game-screen').classList.remove('hidden');
             document.getElementById('game-screen').classList.add('flex');
+            
+            // Mostrar y limpiar historial
+            document.getElementById('round-history-container').classList.remove('hidden');
+            document.getElementById('round-history').innerHTML = '';
             
             log("¡Juego iniciado!");
             updateTurnUI(data.current_turn, data.current_player_name, data.rolls_left);
@@ -316,7 +342,35 @@
         }
 
         function handleTurnChange(data) {
-            log(`Jugador anterior terminó con: ${data.last_player_name}`);
+            log(`Jugador anterior terminó: ${data.last_player_name}`);
+            
+            // AGREGAR AL HISTORIAL MINIATURA
+            if (data.last_player_hand) {
+                const historyList = document.getElementById('round-history');
+                const li = document.createElement('li');
+                li.className = "flex flex-col border-b border-gray-700 pb-2 last:border-0";
+                
+                // Generar HTML de los daditos
+                const diceHtml = data.last_player_hand.map(d => {
+                    let color = 'text-black';
+                    if(['K','Q','J'].includes(d)) color = 'text-yellow-600';
+                    if(['A'].includes(d) || d.includes('♥')) color = 'text-red-600';
+                    return `<span class="mini-die ${color}">${d}</span>`;
+                }).join('');
+
+                li.innerHTML = `
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-bold text-green-400">${data.last_player_name}</span>
+                        <span class="text-xs text-gray-400">${data.last_player_desc}</span>
+                    </div>
+                    <div>${diceHtml}</div>
+                `;
+                historyList.appendChild(li);
+                
+                // Auto-scroll al final
+                historyList.scrollTop = historyList.scrollHeight;
+            }
+
             updateTurnUI(data.current_turn, data.current_player_name, data.rolls_left);
             renderDice(['?', '?', '?', '?', '?']);
         }
@@ -333,7 +387,6 @@
                 const tr = document.createElement('tr');
                 tr.className = "border-b border-gray-200 last:border-0";
                 
-                // Formatear dados para mostrarlos bonitos en la tabla
                 const diceStr = p.dice.map(d => {
                     let color = 'text-black';
                     if(['K','Q','J'].includes(d)) color = 'text-yellow-600';
@@ -358,6 +411,7 @@
             }
 
             modal.classList.remove('hidden');
+            document.getElementById('round-history-container').classList.add('hidden'); // Ocultar mini historial al terminar
         }
 
         function renderDice(diceArray) {
