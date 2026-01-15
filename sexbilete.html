@@ -89,7 +89,6 @@
     <!-- PANTALLA DE JUEGO -->
     <div id="game-screen" class="hidden w-full max-w-4xl flex flex-col items-center z-0">
         <div class="bg-black/40 p-4 rounded-lg mb-8 text-center backdrop-blur-sm w-full max-w-2xl">
-            <!-- AQUÍ SE MOSTRARÁ EL NOMBRE DEL JUGADOR ACTUAL -->
             <h2 id="turn-info" class="text-2xl text-yellow-300 font-bold mb-1">Turno de: ???</h2>
             <p class="text-sm text-gray-200">Tiradas restantes: <span id="rolls-left" class="font-bold text-white text-xl">3</span></p>
         </div>
@@ -176,6 +175,19 @@
             socket.on('dice_rolled', handleDiceUpdate);
             socket.on('turn_change', handleTurnChange);
             socket.on('game_over', handleGameOver);
+            // ESCUCHAMOS EL EVENTO DE NUEVO ANFITRIÓN
+            socket.on('host_promoted', () => {
+                iAmHost = true;
+                // Si estamos en la sala de espera
+                document.getElementById('host-controls').classList.remove('hidden');
+                document.getElementById('waiting-msg').classList.add('hidden');
+                
+                // Si estamos en la pantalla de resultados (fin de juego)
+                document.getElementById('host-restart-controls').classList.remove('hidden');
+                document.getElementById('waiting-restart-msg').classList.add('hidden');
+                
+                showToast("👑 ¡Ahora eres el anfitrión!");
+            });
 
         } catch (e) { console.error(e); }
 
@@ -250,7 +262,6 @@
 
         function updateTurnUI(turnId, playerName, rollsLeft) {
             isMyTurn = (turnId === myId);
-            // Ahora mostramos el nombre del jugador si no es nuestro turno
             const turnText = isMyTurn ? "¡ES TU TURNO!" : `Turno de: ${playerName}`;
             const colorClass = isMyTurn ? "text-yellow-300" : "text-gray-400";
             
