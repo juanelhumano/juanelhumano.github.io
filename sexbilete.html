@@ -29,11 +29,9 @@
             background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20.5V18H0v-2h20v-2H0v-2h20v-2H0V8h20V6H0V4h20V2H0V0h22v20h2V0h2v20h2V0h2v20h2V0h2v20h2v2H22v18h-2V22h-2v18h-2V22h-2v18h-2V22H0v-2h20z' fill='%23146c43' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
         }
 
-        /* Animación suave para el modal */
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .modal-animate { animation: fadeIn 0.3s ease-out; }
 
-        /* Estilo para los dados mini en el historial */
         .mini-die {
             font-size: 0.8rem;
             width: 1.5rem;
@@ -47,18 +45,9 @@
             box-shadow: 1px 1px 2px rgba(0,0,0,0.3);
         }
 
-        /* Scrollbar personalizada para el historial (más estética) */
-        #round-history::-webkit-scrollbar {
-            width: 6px;
-        }
-        #round-history::-webkit-scrollbar-track {
-            background: rgba(0,0,0,0.3);
-            border-radius: 4px;
-        }
-        #round-history::-webkit-scrollbar-thumb {
-            background: rgba(255,255,255,0.3);
-            border-radius: 4px;
-        }
+        #round-history::-webkit-scrollbar { width: 6px; }
+        #round-history::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 4px; }
+        #round-history::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 4px; }
     </style>
 </head>
 <body class="felt-bg text-white h-screen flex flex-col items-center justify-center p-4">
@@ -66,17 +55,14 @@
     <!-- LOBBY -->
     <div id="lobby-screen" class="bg-white text-gray-800 p-8 rounded-lg shadow-2xl max-w-md w-full z-10">
         <h1 class="text-3xl font-bold text-center mb-6 text-green-800">🎲 Sexbilete online</h1>
-        
         <div class="mb-4">
             <label class="block text-sm font-bold mb-2">Tu Nombre</label>
             <input type="text" id="username" class="w-full border p-2 rounded text-lg" placeholder="Ej: Pepe">
         </div>
-
         <div class="flex gap-2 mb-6">
             <button onclick="showCreate()" class="flex-1 bg-green-600 hover:bg-green-700 text-white p-2 rounded font-bold">Crear Sala</button>
             <button onclick="showJoin()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded font-bold">Unirse</button>
         </div>
-
         <div id="create-form" class="hidden space-y-4 border-t pt-4">
             <div>
                 <label class="block text-sm font-bold">Nombre de Sala</label>
@@ -88,7 +74,6 @@
             </div>
             <button onclick="createRoom()" class="w-full bg-green-600 text-white p-3 rounded font-bold text-lg">CREAR Y ENTRAR</button>
         </div>
-
         <div id="join-form" class="hidden space-y-4 border-t pt-4">
             <div>
                 <label class="block text-sm font-bold">Nombre de Sala</label>
@@ -115,14 +100,10 @@
 
     <!-- PANTALLA DE JUEGO -->
     <div id="game-screen" class="hidden w-full max-w-4xl flex flex-col items-center z-0 relative h-full justify-center">
-        
-        <!-- INFO TURNO -->
         <div class="bg-black/40 p-4 rounded-lg mb-8 text-center backdrop-blur-sm w-full max-w-2xl">
             <h2 id="turn-info" class="text-2xl text-yellow-300 font-bold mb-1">Turno de: ???</h2>
             <p class="text-sm text-gray-200">Tiradas restantes: <span id="rolls-left" class="font-bold text-white text-xl">3</span></p>
         </div>
-
-        <!-- DADOS -->
         <div class="flex flex-wrap justify-center gap-4 mb-10 perspective-1000">
             <div id="die-0" onclick="toggleHold(0)" class="die w-20 h-20 bg-white rounded-xl flex items-center justify-center text-4xl text-black font-bold border-b-4 border-gray-300">?</div>
             <div id="die-1" onclick="toggleHold(1)" class="die w-20 h-20 bg-white rounded-xl flex items-center justify-center text-4xl text-black font-bold border-b-4 border-gray-300">?</div>
@@ -130,8 +111,6 @@
             <div id="die-3" onclick="toggleHold(3)" class="die w-20 h-20 bg-white rounded-xl flex items-center justify-center text-4xl text-black font-bold border-b-4 border-gray-300">?</div>
             <div id="die-4" onclick="toggleHold(4)" class="die w-20 h-20 bg-white rounded-xl flex items-center justify-center text-4xl text-black font-bold border-b-4 border-gray-300">?</div>
         </div>
-
-        <!-- CONTROLES -->
         <div id="player-controls" class="flex gap-4 hidden">
             <button onclick="rollDice()" class="bg-yellow-500 hover:bg-yellow-600 text-black px-8 py-4 rounded-full font-bold text-xl shadow-lg transform transition active:scale-95">
                 LANZAR 🎲
@@ -141,23 +120,17 @@
             </button>
         </div>
         <p id="wait-controls-msg" class="text-gray-300 italic text-xl animate-pulse">Esperando jugada...</p>
-        
-        <!-- LOG DEL JUEGO -->
         <div id="game-log" class="mt-8 text-sm text-gray-300 h-24 overflow-y-auto w-full text-center max-w-xl bg-black/20 rounded p-2"></div>
-
-        <!-- HISTORIAL DE JUGADAS (MODIFICADO) -->
-        <!-- Cambios: left-2 (más izquierda), w-56 (menos ancho), max-h-60 (altura máxima), overflow-y-auto (scroll) -->
+        
         <div class="absolute bottom-4 left-2 bg-black/60 p-3 rounded-lg backdrop-blur-md border border-white/10 w-56 max-h-60 flex flex-col hidden" id="round-history-container">
             <h3 class="text-xs text-gray-400 font-bold uppercase mb-2 border-b border-gray-600 pb-1 flex-shrink-0">Resultados Ronda</h3>
-            <ul id="round-history" class="space-y-2 text-sm overflow-y-auto pr-1">
-                <!-- Aquí se inyectan las jugadas pasadas -->
-            </ul>
+            <ul id="round-history" class="space-y-2 text-sm overflow-y-auto pr-1"></ul>
         </div>
     </div>
 
     <!-- MODAL DE RESULTADOS -->
     <div id="results-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50 modal-animate">
-        <div class="bg-white text-gray-900 p-8 rounded-xl shadow-2xl max-w-2xl w-full text-center m-4">
+        <div class="bg-white text-gray-900 p-8 rounded-xl shadow-2xl max-w-2xl w-full text-center m-4 overflow-y-auto max-h-screen">
             <h2 class="text-4xl font-bold mb-2 text-green-700">🏆 RESULTADOS 🏆</h2>
             <p class="text-xl mb-6">Ganador: <span id="winner-name" class="font-bold text-yellow-600 text-2xl"></span></p>
             
@@ -166,6 +139,7 @@
                     <thead>
                         <tr class="border-b border-gray-300 text-gray-500 text-sm">
                             <th class="pb-2">Jugador</th>
+                            <th class="pb-2">Status</th>
                             <th class="pb-2">Dados</th>
                             <th class="pb-2">Mano</th>
                         </tr>
@@ -176,21 +150,30 @@
                 </table>
             </div>
 
-            <div id="host-restart-controls" class="hidden">
-                <button onclick="startGame()" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-full font-bold text-lg shadow-lg">
-                    JUGAR DE NUEVO 🔄
+            <div id="post-game-controls" class="space-y-3">
+                <!-- Botones dinámicos según si eres Host o Jugador -->
+                <button id="btn-ready" onclick="markReady()" class="hidden w-full bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-bold text-lg shadow-lg">
+                    ¡ESTOY LISTO! 👍
+                </button>
+                <div id="host-restart-controls" class="hidden">
+                    <button onclick="startGame()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-full font-bold text-lg shadow-lg">
+                        INICIAR (OMITIR INACTIVOS) 🚀
+                    </button>
+                    <p class="text-sm text-gray-500 mt-2">* Quien no tenga ✅ será expulsado de la sala.</p>
+                </div>
+                <p id="waiting-restart-msg" class="hidden text-gray-500 italic">Esperando que el anfitrión inicie...</p>
+                <button onclick="leaveRoom()" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-full font-bold text-sm">
+                    SALIR DE LA SALA 🚪
                 </button>
             </div>
-            <p id="waiting-restart-msg" class="hidden text-gray-500 italic">Esperando que el anfitrión inicie otra...</p>
         </div>
     </div>
 
-    <!-- NOTIFICACIONES -->
     <div id="toast" class="fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded shadow-lg hidden z-50"></div>
 
     <script>
         // ==========================================
-        // CONFIGURACIÓN (ACTUALIZAR SIEMPRE)
+        // CONFIGURACIÓN
         // ==========================================
         const SERVER_URL = "https://sexbileteserv.onrender.com"; 
         
@@ -200,15 +183,12 @@
         let heldIndices = [];
         let isMyTurn = false;
         let iAmHost = false;
+        let iAmReady = false;
 
         try {
             socket = io(SERVER_URL);
             
-            socket.on('connect', () => {
-                myId = socket.id;
-                console.log("Conectado");
-            });
-
+            socket.on('connect', () => { myId = socket.id; console.log("Conectado"); });
             socket.on('error', (data) => showToast(data.message));
             socket.on('room_joined', handleRoomJoined);
             socket.on('update_room', updatePlayerList);
@@ -216,28 +196,31 @@
             socket.on('dice_rolled', handleDiceUpdate);
             socket.on('turn_change', handleTurnChange);
             socket.on('game_over', handleGameOver);
+            
+            // Nuevos eventos
             socket.on('host_promoted', () => {
                 iAmHost = true;
-                document.getElementById('host-controls').classList.remove('hidden');
-                document.getElementById('waiting-msg').classList.add('hidden');
-                document.getElementById('host-restart-controls').classList.remove('hidden');
-                document.getElementById('waiting-restart-msg').classList.add('hidden');
+                refreshHostControls();
                 showToast("👑 ¡Ahora eres el anfitrión!");
+            });
+            
+            socket.on('player_status_update', (data) => {
+                // Actualizar icono de estado en la tabla de resultados
+                const statusSpan = document.getElementById(`status-${data.player_id}`);
+                if(statusSpan) {
+                    statusSpan.innerHTML = data.is_ready ? '✅' : '⏳';
+                }
+            });
+
+            socket.on('kicked_inactive', () => {
+                alert("Has sido eliminado de la sala por inactividad.");
+                location.reload(); // Recargar para volver al inicio
             });
 
         } catch (e) { console.error(e); }
 
-        // ================= UI LOGIC =================
-
-        function showCreate() {
-            document.getElementById('create-form').classList.remove('hidden');
-            document.getElementById('join-form').classList.add('hidden');
-        }
-
-        function showJoin() {
-            document.getElementById('create-form').classList.add('hidden');
-            document.getElementById('join-form').classList.remove('hidden');
-        }
+        function showCreate() { document.getElementById('create-form').classList.remove('hidden'); document.getElementById('join-form').classList.add('hidden'); }
+        function showJoin() { document.getElementById('create-form').classList.add('hidden'); document.getElementById('join-form').classList.remove('hidden'); }
 
         function createRoom() {
             const username = document.getElementById('username').value;
@@ -260,12 +243,7 @@
             document.getElementById('lobby-screen').classList.add('hidden');
             document.getElementById('waiting-screen').classList.remove('hidden');
             document.getElementById('room-name-display').innerText = currentRoomId;
-
-            if (data.is_host) {
-                document.getElementById('host-controls').classList.remove('hidden');
-            } else {
-                document.getElementById('waiting-msg').classList.remove('hidden');
-            }
+            refreshHostControls();
         }
 
         function updatePlayerList(players) {
@@ -279,37 +257,36 @@
             });
         }
 
-        function startGame() {
-            socket.emit('start_game', currentRoomId);
-        }
+        function startGame() { socket.emit('start_game', currentRoomId); }
 
         function handleGameStart(data) {
             document.getElementById('waiting-screen').classList.add('hidden');
             document.getElementById('results-modal').classList.add('hidden');
             document.getElementById('game-screen').classList.remove('hidden');
             document.getElementById('game-screen').classList.add('flex');
-            
-            // Mostrar y limpiar historial
             document.getElementById('round-history-container').classList.remove('hidden');
             document.getElementById('round-history').innerHTML = '';
             
+            iAmReady = false; // Resetear estado local
+            document.getElementById('btn-ready').classList.remove('hidden'); // Resetear botón
+            document.getElementById('btn-ready').disabled = false;
+            document.getElementById('btn-ready').innerHTML = "¡ESTOY LISTO! 👍";
+            document.getElementById('btn-ready').classList.remove('bg-gray-400');
+            document.getElementById('btn-ready').classList.add('bg-green-600');
+
             log("¡Juego iniciado!");
             updateTurnUI(data.current_turn, data.current_player_name, data.rolls_left);
             renderDice(data.dice);
         }
 
-        // ================= GAME LOGIC =================
-
         function updateTurnUI(turnId, playerName, rollsLeft) {
             isMyTurn = (turnId === myId);
             const turnText = isMyTurn ? "¡ES TU TURNO!" : `Turno de: ${playerName}`;
             const colorClass = isMyTurn ? "text-yellow-300" : "text-gray-400";
-            
             const turnInfo = document.getElementById('turn-info');
             turnInfo.innerText = turnText;
             turnInfo.className = `text-2xl font-bold mb-1 ${colorClass}`;
             document.getElementById('rolls-left').innerText = rollsLeft;
-
             if (isMyTurn) {
                 document.getElementById('player-controls').classList.remove('hidden');
                 document.getElementById('wait-controls-msg').classList.add('hidden');
@@ -317,7 +294,6 @@
                 document.getElementById('player-controls').classList.add('hidden');
                 document.getElementById('wait-controls-msg').classList.remove('hidden');
             }
-
             heldIndices = [];
             document.querySelectorAll('.die').forEach(d => d.classList.remove('selected'));
         }
@@ -326,7 +302,6 @@
             if (!isMyTurn) return;
             const dieElement = document.getElementById(`die-${index}`);
             if (dieElement.innerText === '?') return;
-
             if (heldIndices.includes(index)) {
                 heldIndices = heldIndices.filter(i => i !== index);
                 dieElement.classList.remove('selected');
@@ -345,9 +320,7 @@
 
         function passTurn() {
             if (!isMyTurn) return;
-            if (confirm("¿Terminar tu turno?")) {
-                socket.emit('pass_turn', currentRoomId);
-            }
+            if (confirm("¿Terminar tu turno?")) socket.emit('pass_turn', currentRoomId);
         }
 
         function handleDiceUpdate(data) {
@@ -356,51 +329,34 @@
         }
 
         function handleTurnChange(data) {
-            log(`Jugador anterior terminó: ${data.last_player_name}`);
-            
-            // AGREGAR AL HISTORIAL MINIATURA
+            log(`Terminó: ${data.last_player_name}`);
             if (data.last_player_hand) {
                 const historyList = document.getElementById('round-history');
                 const li = document.createElement('li');
                 li.className = "flex flex-col border-b border-gray-700 pb-2 last:border-0";
-                
-                // Generar HTML de los daditos
                 const diceHtml = data.last_player_hand.map(d => {
                     let color = 'text-black';
                     if(['K','Q','J'].includes(d)) color = 'text-yellow-600';
                     if(['A'].includes(d) || d.includes('♥')) color = 'text-red-600';
                     return `<span class="mini-die ${color}">${d}</span>`;
                 }).join('');
-
-                li.innerHTML = `
-                    <div class="flex justify-between items-center mb-1">
-                        <span class="font-bold text-green-400">${data.last_player_name}</span>
-                        <span class="text-xs text-gray-400">${data.last_player_desc}</span>
-                    </div>
-                    <div>${diceHtml}</div>
-                `;
+                li.innerHTML = `<div class="flex justify-between items-center mb-1"><span class="font-bold text-green-400">${data.last_player_name}</span><span class="text-xs text-gray-400">${data.last_player_desc}</span></div><div>${diceHtml}</div>`;
                 historyList.appendChild(li);
-                
-                // Auto-scroll al final (esto asegura que se vea lo último)
                 historyList.scrollTop = historyList.scrollHeight;
             }
-
             updateTurnUI(data.current_turn, data.current_player_name, data.rolls_left);
             renderDice(['?', '?', '?', '?', '?']);
         }
 
         function handleGameOver(data) {
             const modal = document.getElementById('results-modal');
-            const winnerSpan = document.getElementById('winner-name');
+            document.getElementById('winner-name').innerText = data.winner_name;
             const tbody = document.getElementById('results-table-body');
-            
-            winnerSpan.innerText = data.winner_name;
             tbody.innerHTML = '';
 
             data.results.forEach(p => {
                 const tr = document.createElement('tr');
                 tr.className = "border-b border-gray-200 last:border-0";
-                
                 const diceStr = p.dice.map(d => {
                     let color = 'text-black';
                     if(['K','Q','J'].includes(d)) color = 'text-yellow-600';
@@ -408,49 +364,81 @@
                     return `<span class="font-bold ${color}">${d}</span>`;
                 }).join(' ');
 
+                // Icono de estado inicial (todos pendientes menos Host que implícitamente está listo)
+                // Pero visualmente todos comienzan pendientes hasta que confirman
                 tr.innerHTML = `
                     <td class="py-3 font-medium">${p.name} ${p.name === data.winner_name ? '👑' : ''}</td>
+                    <td class="py-3 text-2xl" id="status-${p.id}">⏳</td> 
                     <td class="py-3">${diceStr}</td>
                     <td class="py-3 text-sm text-gray-600 font-bold">${p.desc}</td>
                 `;
                 tbody.appendChild(tr);
             });
 
-            if(iAmHost) {
-                document.getElementById('host-restart-controls').classList.remove('hidden');
-                document.getElementById('waiting-restart-msg').classList.add('hidden');
-            } else {
-                document.getElementById('host-restart-controls').classList.add('hidden');
-                document.getElementById('waiting-restart-msg').classList.remove('hidden');
+            // Configurar botones post-juego
+            refreshHostControls();
+            
+            // Si soy host, mi icono es verde automático en la logica mental, 
+            // pero para ser justos, el host también confirma al dar START. 
+            // O mejor: El host siempre tiene ✅ visualmente.
+            if (iAmHost) {
+                 const myStatus = document.getElementById(`status-${myId}`);
+                 if(myStatus) myStatus.innerHTML = '✅';
             }
 
             modal.classList.remove('hidden');
-            document.getElementById('round-history-container').classList.add('hidden'); // Ocultar mini historial al terminar
+            document.getElementById('round-history-container').classList.add('hidden');
+        }
+
+        function markReady() {
+            socket.emit('player_ready', currentRoomId);
+            iAmReady = true;
+            const btn = document.getElementById('btn-ready');
+            btn.innerHTML = "Esperando al host... ⏳";
+            btn.classList.replace('bg-green-600', 'bg-gray-400');
+            btn.disabled = true;
+        }
+
+        function leaveRoom() {
+            location.reload();
+        }
+
+        function refreshHostControls() {
+            const hostControls = document.getElementById('host-restart-controls');
+            const waitMsg = document.getElementById('waiting-restart-msg');
+            const btnReady = document.getElementById('btn-ready');
+
+            // En pantalla de espera (lobby)
+            const lobbyHost = document.getElementById('host-controls');
+            const lobbyMsg = document.getElementById('waiting-msg');
+            if(lobbyHost && lobbyMsg) {
+                if(iAmHost) { lobbyHost.classList.remove('hidden'); lobbyMsg.classList.add('hidden'); }
+                else { lobbyHost.classList.add('hidden'); lobbyMsg.classList.remove('hidden'); }
+            }
+
+            // En modal de resultados
+            if (iAmHost) {
+                hostControls.classList.remove('hidden');
+                waitMsg.classList.add('hidden');
+                btnReady.classList.add('hidden'); // El host usa "INICIAR" como su confirmación
+            } else {
+                hostControls.classList.add('hidden');
+                waitMsg.classList.remove('hidden');
+                btnReady.classList.remove('hidden');
+            }
         }
 
         function renderDice(diceArray) {
             diceArray.forEach((val, idx) => {
                 const el = document.getElementById(`die-${idx}`);
                 el.innerText = val;
-                
                 if (['K', 'Q', 'J'].includes(val)) el.style.color = '#d97706';
                 else if (val === 'A' || val.includes('♥')) el.style.color = '#dc2626';
                 else el.style.color = '#000000';
             });
         }
-
-        function showToast(msg) {
-            const t = document.getElementById('toast');
-            t.innerText = msg;
-            t.classList.remove('hidden');
-            setTimeout(() => t.classList.add('hidden'), 3000);
-        }
-
-        function log(msg) {
-            const div = document.createElement('div');
-            div.innerText = `> ${msg}`;
-            document.getElementById('game-log').prepend(div);
-        }
+        function showToast(msg) { const t = document.getElementById('toast'); t.innerText = msg; t.classList.remove('hidden'); setTimeout(() => t.classList.add('hidden'), 3000); }
+        function log(msg) { const div = document.createElement('div'); div.innerText = `> ${msg}`; document.getElementById('game-log').prepend(div); }
     </script>
 </body>
 </html>
