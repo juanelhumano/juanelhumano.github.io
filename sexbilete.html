@@ -15,12 +15,12 @@
             transition: all 0.2s;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
             cursor: pointer;
+            user-select: none;
         }
         
-        /* Estilo para dado seleccionado (guardado) */
         .die.selected {
             transform: translateY(15px);
-            border: 4px solid #fcd34d; /* Amarillo dorado */
+            border: 4px solid #fcd34d;
             box-shadow: 0 0 15px #fcd34d;
         }
 
@@ -28,12 +28,16 @@
             background-color: #0f5132;
             background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20.5V18H0v-2h20v-2H0v-2h20v-2H0V8h20V6H0V4h20V2H0V0h22v20h2V0h2v20h2V0h2v20h2V0h2v20h2v2H22v18h-2V22h-2v18h-2V22h-2v18h-2V22H0v-2h20z' fill='%23146c43' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
         }
+
+        /* Animación suave para el modal */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal-animate { animation: fadeIn 0.3s ease-out; }
     </style>
 </head>
 <body class="felt-bg text-white h-screen flex flex-col items-center justify-center p-4">
 
-    <!-- PANTALLA DE LOGIN / LOBBY -->
-    <div id="lobby-screen" class="bg-white text-gray-800 p-8 rounded-lg shadow-2xl max-w-md w-full">
+    <!-- LOBBY -->
+    <div id="lobby-screen" class="bg-white text-gray-800 p-8 rounded-lg shadow-2xl max-w-md w-full z-10">
         <h1 class="text-3xl font-bold text-center mb-6 text-green-800">🎲 Sexbilete online</h1>
         
         <div class="mb-4">
@@ -46,7 +50,6 @@
             <button onclick="showJoin()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded font-bold">Unirse</button>
         </div>
 
-        <!-- Formulario Crear -->
         <div id="create-form" class="hidden space-y-4 border-t pt-4">
             <div>
                 <label class="block text-sm font-bold">Nombre de Sala</label>
@@ -59,7 +62,6 @@
             <button onclick="createRoom()" class="w-full bg-green-600 text-white p-3 rounded font-bold text-lg">CREAR Y ENTRAR</button>
         </div>
 
-        <!-- Formulario Unirse -->
         <div id="join-form" class="hidden space-y-4 border-t pt-4">
             <div>
                 <label class="block text-sm font-bold">Nombre de Sala</label>
@@ -69,14 +71,12 @@
         </div>
     </div>
 
-    <!-- PANTALLA DE SALA DE ESPERA -->
-    <div id="waiting-screen" class="hidden bg-white text-gray-800 p-8 rounded-lg shadow-xl w-full max-w-lg text-center">
+    <!-- SALA DE ESPERA -->
+    <div id="waiting-screen" class="hidden bg-white text-gray-800 p-8 rounded-lg shadow-xl w-full max-w-lg text-center z-10">
         <h2 class="text-2xl font-bold mb-4">Sala: <span id="room-name-display" class="text-green-600"></span></h2>
         <div class="mb-6">
             <h3 class="font-bold text-gray-500 mb-2">Jugadores conectados:</h3>
-            <ul id="players-list" class="space-y-2 text-lg">
-                <!-- Lista de jugadores -->
-            </ul>
+            <ul id="players-list" class="space-y-2 text-lg"></ul>
         </div>
         <div id="host-controls" class="hidden">
             <button onclick="startGame()" class="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-full font-bold shadow-lg transform transition hover:scale-105">
@@ -87,17 +87,13 @@
     </div>
 
     <!-- PANTALLA DE JUEGO -->
-    <div id="game-screen" class="hidden w-full max-w-4xl flex flex-col items-center">
-        
-        <!-- Info del Turno -->
-        <div class="bg-black/40 p-4 rounded-lg mb-8 text-center backdrop-blur-sm w-full">
+    <div id="game-screen" class="hidden w-full max-w-4xl flex flex-col items-center z-0">
+        <div class="bg-black/40 p-4 rounded-lg mb-8 text-center backdrop-blur-sm w-full max-w-2xl">
             <h2 id="turn-info" class="text-2xl text-yellow-300 font-bold mb-1">Turno de: ???</h2>
             <p class="text-sm text-gray-200">Tiradas restantes: <span id="rolls-left" class="font-bold text-white text-xl">3</span></p>
         </div>
 
-        <!-- Área de Dados -->
         <div class="flex flex-wrap justify-center gap-4 mb-10 perspective-1000">
-            <!-- Los 5 dados -->
             <div id="die-0" onclick="toggleHold(0)" class="die w-20 h-20 bg-white rounded-xl flex items-center justify-center text-4xl text-black font-bold border-b-4 border-gray-300">?</div>
             <div id="die-1" onclick="toggleHold(1)" class="die w-20 h-20 bg-white rounded-xl flex items-center justify-center text-4xl text-black font-bold border-b-4 border-gray-300">?</div>
             <div id="die-2" onclick="toggleHold(2)" class="die w-20 h-20 bg-white rounded-xl flex items-center justify-center text-4xl text-black font-bold border-b-4 border-gray-300">?</div>
@@ -105,32 +101,56 @@
             <div id="die-4" onclick="toggleHold(4)" class="die w-20 h-20 bg-white rounded-xl flex items-center justify-center text-4xl text-black font-bold border-b-4 border-gray-300">?</div>
         </div>
 
-        <!-- Controles -->
         <div id="player-controls" class="flex gap-4 hidden">
             <button onclick="rollDice()" class="bg-yellow-500 hover:bg-yellow-600 text-black px-8 py-4 rounded-full font-bold text-xl shadow-lg transform transition active:scale-95">
-                LANZAR DADOS 🎲
+                LANZAR 🎲
             </button>
             <button onclick="passTurn()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-4 rounded-full font-bold text-xl shadow-lg">
-                PASAR / TERMINAR
+                TERMINAR
             </button>
         </div>
         <p id="wait-controls-msg" class="text-gray-300 italic text-xl animate-pulse">Esperando jugada...</p>
-
-        <!-- Log del juego -->
-        <div id="game-log" class="mt-8 text-sm text-gray-300 h-24 overflow-y-auto w-full text-center"></div>
+        
+        <div id="game-log" class="mt-8 text-sm text-gray-300 h-24 overflow-y-auto w-full text-center max-w-xl bg-black/20 rounded p-2"></div>
     </div>
 
-    <!-- NOTIFICACIONES (Toast) -->
-    <div id="toast" class="fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded shadow-lg hidden">
-        Error
+    <!-- MODAL DE RESULTADOS -->
+    <div id="results-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50 modal-animate">
+        <div class="bg-white text-gray-900 p-8 rounded-xl shadow-2xl max-w-2xl w-full text-center m-4">
+            <h2 class="text-4xl font-bold mb-2 text-green-700">🏆 RESULTADOS 🏆</h2>
+            <p class="text-xl mb-6">Ganador: <span id="winner-name" class="font-bold text-yellow-600 text-2xl"></span></p>
+            
+            <div class="bg-gray-100 rounded-lg p-4 mb-6">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="border-b border-gray-300 text-gray-500 text-sm">
+                            <th class="pb-2">Jugador</th>
+                            <th class="pb-2">Dados</th>
+                            <th class="pb-2">Mano</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-table-body" class="text-lg">
+                        <!-- Filas de resultados -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="host-restart-controls" class="hidden">
+                <button onclick="startGame()" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-full font-bold text-lg shadow-lg">
+                    JUGAR DE NUEVO 🔄
+                </button>
+            </div>
+            <p id="waiting-restart-msg" class="hidden text-gray-500 italic">Esperando que el anfitrión inicie otra...</p>
+        </div>
     </div>
+
+    <!-- NOTIFICACIONES -->
+    <div id="toast" class="fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded shadow-lg hidden z-50"></div>
 
     <script>
         // ==========================================
-        // CONFIGURACIÓN
+        // CONFIGURACIÓN (ACTUALIZAR SIEMPRE)
         // ==========================================
-        // IMPORTANTE: Cambia esto por la URL de Render cuando despliegues
-        // Ej: const SERVER_URL = "https://mi-cubilete.onrender.com";
         const SERVER_URL = "https://sexbileteserv.onrender.com"; 
         
         let socket;
@@ -138,36 +158,27 @@
         let currentRoomId;
         let heldIndices = [];
         let isMyTurn = false;
+        let iAmHost = false;
 
-        // Inicializar conexión
         try {
             socket = io(SERVER_URL);
             
             socket.on('connect', () => {
                 myId = socket.id;
-                console.log("Conectado al servidor");
+                console.log("Conectado");
             });
 
-            socket.on('connect_error', () => {
-                showToast("Error conectando al servidor. Asegúrate que el backend está corriendo.");
-            });
-
-            // Eventos de Socket
             socket.on('error', (data) => showToast(data.message));
             socket.on('room_joined', handleRoomJoined);
             socket.on('update_room', updatePlayerList);
             socket.on('game_started', handleGameStart);
             socket.on('dice_rolled', handleDiceUpdate);
             socket.on('turn_change', handleTurnChange);
+            socket.on('game_over', handleGameOver);
 
-        } catch (e) {
-            console.error("Error socket", e);
-            showToast("Error crítico de conexión");
-        }
+        } catch (e) { console.error(e); }
 
-        // ==========================================
-        // LÓGICA DE UI
-        // ==========================================
+        // ================= UI LOGIC =================
 
         function showCreate() {
             document.getElementById('create-form').classList.remove('hidden');
@@ -183,30 +194,24 @@
             const username = document.getElementById('username').value;
             const roomId = document.getElementById('create-room-id').value;
             const maxRolls = document.getElementById('max-rolls').value;
-            
-            if(!username || !roomId) return showToast("Completa los campos");
-
+            if(!username || !roomId) return showToast("Faltan datos");
             socket.emit('create_room', { username, room_id: roomId, max_rolls: maxRolls });
         }
 
         function joinRoom() {
             const username = document.getElementById('username').value;
             const roomId = document.getElementById('join-room-id').value;
-
-            if(!username || !roomId) return showToast("Completa los campos");
-
+            if(!username || !roomId) return showToast("Faltan datos");
             socket.emit('join_room', { username, room_id: roomId });
         }
 
         function handleRoomJoined(data) {
             currentRoomId = data.room_id;
-            
-            // Cambiar pantallas
+            iAmHost = data.is_host;
             document.getElementById('lobby-screen').classList.add('hidden');
             document.getElementById('waiting-screen').classList.remove('hidden');
             document.getElementById('room-name-display').innerText = currentRoomId;
 
-            // Mostrar controles de host si aplica
             if (data.is_host) {
                 document.getElementById('host-controls').classList.remove('hidden');
             } else {
@@ -231,27 +236,25 @@
 
         function handleGameStart(data) {
             document.getElementById('waiting-screen').classList.add('hidden');
+            document.getElementById('results-modal').classList.add('hidden'); // Ocultar resultados si estaban
             document.getElementById('game-screen').classList.remove('hidden');
-            document.getElementById('game-screen').classList.add('flex'); // Add flex for layout
+            document.getElementById('game-screen').classList.add('flex');
             
+            log("¡Juego iniciado!");
             updateTurnUI(data.current_turn, data.rolls_left);
             renderDice(data.dice);
-            log("¡El juego ha comenzado!");
         }
 
-        // ==========================================
-        // LÓGICA DE JUEGO
-        // ==========================================
+        // ================= GAME LOGIC =================
 
         function updateTurnUI(turnId, rollsLeft) {
             isMyTurn = (turnId === myId);
-            const turnText = isMyTurn ? "¡ES TU TURNO!" : "Esperando a otro jugador...";
+            const turnText = isMyTurn ? "¡ES TU TURNO!" : "Esperando al otro jugador...";
             const colorClass = isMyTurn ? "text-yellow-300" : "text-gray-400";
             
             const turnInfo = document.getElementById('turn-info');
             turnInfo.innerText = turnText;
             turnInfo.className = `text-2xl font-bold mb-1 ${colorClass}`;
-            
             document.getElementById('rolls-left').innerText = rollsLeft;
 
             if (isMyTurn) {
@@ -262,17 +265,13 @@
                 document.getElementById('wait-controls-msg').classList.remove('hidden');
             }
 
-            // Resetear dados seleccionados al cambiar de turno
             heldIndices = [];
             document.querySelectorAll('.die').forEach(d => d.classList.remove('selected'));
         }
 
         function toggleHold(index) {
-            if (!isMyTurn) return; // Solo puedes seleccionar en tu turno
-            
+            if (!isMyTurn) return;
             const dieElement = document.getElementById(`die-${index}`);
-            
-            // No se pueden seleccionar dados no tirados ('?')
             if (dieElement.innerText === '?') return;
 
             if (heldIndices.includes(index)) {
@@ -286,18 +285,14 @@
 
         function rollDice() {
             if (!isMyTurn) return;
-            socket.emit('roll_dice', { 
-                room_id: currentRoomId, 
-                held_indices: heldIndices 
-            });
-            // Animación simple visual
+            socket.emit('roll_dice', { room_id: currentRoomId, held_indices: heldIndices });
             document.querySelectorAll('.die:not(.selected)').forEach(d => d.style.transform = 'rotate(360deg)');
             setTimeout(() => document.querySelectorAll('.die').forEach(d => d.style.transform = ''), 200);
         }
 
         function passTurn() {
             if (!isMyTurn) return;
-            if (confirm("¿Seguro que quieres pasar el turno?")) {
+            if (confirm("¿Terminar tu turno?")) {
                 socket.emit('pass_turn', currentRoomId);
             }
         }
@@ -305,18 +300,51 @@
         function handleDiceUpdate(data) {
             renderDice(data.dice);
             document.getElementById('rolls-left').innerText = data.rolls_left;
-            
-            // Si no quedan tiradas, el jugador debe pasar o el sistema podría forzarlo
-            if(data.player_id === myId && data.rolls_left === 0) {
-                 log("Te quedaste sin tiradas. Pasa el turno.");
-            }
         }
 
         function handleTurnChange(data) {
-            log(`Jugador anterior terminó. Turno nuevo.`);
+            log(`Jugador anterior terminó con: ${data.last_player_name}`);
             updateTurnUI(data.current_turn, data.rolls_left);
-            // Reset visual de dados
             renderDice(['?', '?', '?', '?', '?']);
+        }
+
+        function handleGameOver(data) {
+            const modal = document.getElementById('results-modal');
+            const winnerSpan = document.getElementById('winner-name');
+            const tbody = document.getElementById('results-table-body');
+            
+            winnerSpan.innerText = data.winner_name;
+            tbody.innerHTML = '';
+
+            data.results.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-gray-200 last:border-0";
+                
+                // Formatear dados para mostrarlos bonitos en la tabla
+                const diceStr = p.dice.map(d => {
+                    let color = 'text-black';
+                    if(['K','Q','J'].includes(d)) color = 'text-yellow-600';
+                    if(['A'].includes(d) || d.includes('♥')) color = 'text-red-600';
+                    return `<span class="font-bold ${color}">${d}</span>`;
+                }).join(' ');
+
+                tr.innerHTML = `
+                    <td class="py-3 font-medium">${p.name} ${p.name === data.winner_name ? '👑' : ''}</td>
+                    <td class="py-3">${diceStr}</td>
+                    <td class="py-3 text-sm text-gray-600 font-bold">${p.desc}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            if(iAmHost) {
+                document.getElementById('host-restart-controls').classList.remove('hidden');
+                document.getElementById('waiting-restart-msg').classList.add('hidden');
+            } else {
+                document.getElementById('host-restart-controls').classList.add('hidden');
+                document.getElementById('waiting-restart-msg').classList.remove('hidden');
+            }
+
+            modal.classList.remove('hidden');
         }
 
         function renderDice(diceArray) {
@@ -324,22 +352,11 @@
                 const el = document.getElementById(`die-${idx}`);
                 el.innerText = val;
                 
-                // Lógica de colores actualizada para los nuevos dados
-                if (['K', 'Q', 'J'].includes(val)) {
-                    el.style.color = '#d97706'; // Ambar para figuras
-                } else if (val === 'A' || val.includes('♥')) {
-                    el.style.color = '#dc2626'; // Rojo para As y Corazones
-                } else if (val.includes('♠')) {
-                    el.style.color = '#000000'; // Negro para Picas
-                } else {
-                    el.style.color = '#000000'; // Negro por defecto
-                }
+                if (['K', 'Q', 'J'].includes(val)) el.style.color = '#d97706';
+                else if (val === 'A' || val.includes('♥')) el.style.color = '#dc2626';
+                else el.style.color = '#000000';
             });
         }
-
-        // ==========================================
-        // UTILIDADES
-        // ==========================================
 
         function showToast(msg) {
             const t = document.getElementById('toast');
