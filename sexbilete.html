@@ -46,6 +46,19 @@
             margin-right: 2px;
             box-shadow: 1px 1px 2px rgba(0,0,0,0.3);
         }
+
+        /* Scrollbar personalizada para el historial (más estética) */
+        #round-history::-webkit-scrollbar {
+            width: 6px;
+        }
+        #round-history::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+        }
+        #round-history::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.3);
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body class="felt-bg text-white h-screen flex flex-col items-center justify-center p-4">
@@ -132,10 +145,11 @@
         <!-- LOG DEL JUEGO -->
         <div id="game-log" class="mt-8 text-sm text-gray-300 h-24 overflow-y-auto w-full text-center max-w-xl bg-black/20 rounded p-2"></div>
 
-        <!-- HISTORIAL DE JUGADAS (Mini Tablita) -->
-        <div class="absolute bottom-4 left-4 bg-black/60 p-3 rounded-lg backdrop-blur-md border border-white/10 w-64 hidden" id="round-history-container">
-            <h3 class="text-xs text-gray-400 font-bold uppercase mb-2 border-b border-gray-600 pb-1">Resultados Ronda Actual</h3>
-            <ul id="round-history" class="space-y-2 text-sm">
+        <!-- HISTORIAL DE JUGADAS (MODIFICADO) -->
+        <!-- Cambios: left-2 (más izquierda), w-56 (menos ancho), max-h-60 (altura máxima), overflow-y-auto (scroll) -->
+        <div class="absolute bottom-4 left-2 bg-black/60 p-3 rounded-lg backdrop-blur-md border border-white/10 w-56 max-h-60 flex flex-col hidden" id="round-history-container">
+            <h3 class="text-xs text-gray-400 font-bold uppercase mb-2 border-b border-gray-600 pb-1 flex-shrink-0">Resultados Ronda</h3>
+            <ul id="round-history" class="space-y-2 text-sm overflow-y-auto pr-1">
                 <!-- Aquí se inyectan las jugadas pasadas -->
             </ul>
         </div>
@@ -367,7 +381,7 @@
                 `;
                 historyList.appendChild(li);
                 
-                // Auto-scroll al final
+                // Auto-scroll al final (esto asegura que se vea lo último)
                 historyList.scrollTop = historyList.scrollHeight;
             }
 
