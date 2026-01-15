@@ -89,6 +89,7 @@
     <!-- PANTALLA DE JUEGO -->
     <div id="game-screen" class="hidden w-full max-w-4xl flex flex-col items-center z-0">
         <div class="bg-black/40 p-4 rounded-lg mb-8 text-center backdrop-blur-sm w-full max-w-2xl">
+            <!-- AQUÍ SE MOSTRARÁ EL NOMBRE DEL JUGADOR ACTUAL -->
             <h2 id="turn-info" class="text-2xl text-yellow-300 font-bold mb-1">Turno de: ???</h2>
             <p class="text-sm text-gray-200">Tiradas restantes: <span id="rolls-left" class="font-bold text-white text-xl">3</span></p>
         </div>
@@ -241,15 +242,16 @@
             document.getElementById('game-screen').classList.add('flex');
             
             log("¡Juego iniciado!");
-            updateTurnUI(data.current_turn, data.rolls_left);
+            updateTurnUI(data.current_turn, data.current_player_name, data.rolls_left);
             renderDice(data.dice);
         }
 
         // ================= GAME LOGIC =================
 
-        function updateTurnUI(turnId, rollsLeft) {
+        function updateTurnUI(turnId, playerName, rollsLeft) {
             isMyTurn = (turnId === myId);
-            const turnText = isMyTurn ? "¡ES TU TURNO!" : "Esperando al otro jugador...";
+            // Ahora mostramos el nombre del jugador si no es nuestro turno
+            const turnText = isMyTurn ? "¡ES TU TURNO!" : `Turno de: ${playerName}`;
             const colorClass = isMyTurn ? "text-yellow-300" : "text-gray-400";
             
             const turnInfo = document.getElementById('turn-info');
@@ -304,7 +306,7 @@
 
         function handleTurnChange(data) {
             log(`Jugador anterior terminó con: ${data.last_player_name}`);
-            updateTurnUI(data.current_turn, data.rolls_left);
+            updateTurnUI(data.current_turn, data.current_player_name, data.rolls_left);
             renderDice(['?', '?', '?', '?', '?']);
         }
 
