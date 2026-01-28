@@ -154,7 +154,8 @@
                             <input type="number" id="betInput" value="100" min="0" class="w-full bg-slate-800 text-white border border-slate-600 rounded p-2 text-right font-mono text-yellow-500">
                         </div>
 
-                        <div id="poker-options" class="hidden">
+                        <!-- Generic Wildcard Option (Available for Poker, Texas, Viuda) -->
+                        <div id="wildcard-option" class="hidden">
                             <label class="flex items-center justify-between cursor-pointer">
                                 <span class="text-white text-sm">¿Comodines Aleatorios?</span>
                                 <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
@@ -222,17 +223,21 @@
                 </div>
             </div>
 
+            <!-- LAYOUT FIX: Added flex-col and justify-between to ensure spacing -->
             <div class="poker-table w-full max-w-5xl flex-grow relative m-2 rounded-[60px] flex flex-col justify-between p-4">
                 
-                <div id="opponents-area" class="flex justify-center gap-4 flex-wrap z-10"></div>
+                <!-- TOP: Opponents Area -->
+                <div id="opponents-area" class="flex justify-center gap-4 flex-wrap z-10 min-h-[100px]"></div>
 
-                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <div id="center-logo" class="opacity-10 text-4xl md:text-6xl text-black brand-font text-center leading-tight mb-4">CASINO<br>PERRÓN</div>
-                    <!-- Community Cards Container (Shared for Texas & Viuda) -->
-                    <div id="community-cards-container" class="flex gap-2 h-24 pointer-events-auto"></div>
+                <!-- MIDDLE: Community Cards & Logo -->
+                <div class="flex flex-col items-center justify-center my-4 z-0">
+                    <div id="center-logo" class="opacity-10 text-4xl md:text-6xl text-black brand-font text-center leading-tight mb-2">CASINO<br>PERRÓN</div>
+                    <!-- Community Cards Container -->
+                    <div id="community-cards-container" class="flex gap-2 min-h-[90px] pointer-events-auto"></div>
                 </div>
 
-                <div class="self-center mt-auto flex flex-col items-center relative z-10 mb-2">
+                <!-- BOTTOM: My Player Area -->
+                <div class="self-center flex flex-col items-center relative z-10 mb-2">
                     <div id="my-score-container" class="flex items-center gap-2 mb-2">
                         <span class="text-xs text-slate-400 font-bold uppercase">Tu mano</span>
                         <div id="my-score-bubble" class="bg-slate-900 text-white px-3 py-1 rounded-full text-lg font-bold border border-slate-600 shadow-lg min-w-[40px] text-center">0</div>
@@ -369,10 +374,11 @@
             
             document.getElementById('lobby-title').textContent = title;
             
-            if(game === 'poker') {
-                document.getElementById('poker-options').classList.remove('hidden');
+            // Mostrar opción de comodines para Poker, Texas y Viuda
+            if(['poker', 'texas', 'viuda'].includes(game)) {
+                document.getElementById('wildcard-option').classList.remove('hidden');
             } else {
-                document.getElementById('poker-options').classList.add('hidden');
+                document.getElementById('wildcard-option').classList.add('hidden');
             }
             
             showScreen('screen-lobby');
@@ -392,7 +398,7 @@
             socket.emit('create_room', { 
                 host: currentState.name, 
                 game: currentState.gameType,
-                wildcards: (currentState.gameType === 'poker' && wildcards),
+                wildcards: (['poker', 'texas', 'viuda'].includes(currentState.gameType) && wildcards),
                 bet: bet
             });
         }
@@ -621,7 +627,6 @@
                 document.getElementById('controls-texas').classList.remove('hidden-screen');
             } else if (state.game_type === 'viuda') {
                 document.getElementById('controls-viuda').classList.remove('hidden-screen');
-                // Controls managed by state status in updateTable
             }
         }
 
@@ -652,12 +657,14 @@
              const clickFn = isViuda ? `onclick="selectSwapCard(${idx}, 'comm')"` : '';
              const cursor = isViuda ? 'cursor-pointer hover:mb-2' : '';
              const idAttr = isViuda ? `id="comm-card-${idx}"` : '';
-             
+             const isWild = (currentState.wildRank && card.rank === currentState.wildRank);
+
              return `
-                <div ${idAttr} class="card ${color} animate-deal ${cursor}" style="margin: 0; animation-delay: ${idx * 0.1}s" ${clickFn}>
+                <div ${idAttr} class="card ${color} ${isWild ? 'wild' : ''} animate-deal ${cursor}" style="margin: 0; animation-delay: ${idx * 0.1}s" ${clickFn}>
                     <div class="absolute top-1 left-1 text-xs">${card.rank}</div>
                     <div class="text-xl">${card.suit}</div>
                     <div class="absolute bottom-1 right-1 text-xs transform rotate-180">${card.rank}</div>
+                     ${isWild ? '<div class="absolute inset-0 flex items-center justify-center text-purple-500 opacity-20 text-4xl font-bold">★</div>' : ''}
                 </div>
              `;
         }
@@ -836,7 +843,6 @@
                 const oppCards = state.hands[p] || [];
                 let cardsHtml = "";
                 
-                // VISIBILIDAD CARTAS
                 let showAll = (state.status === 'finished');
                 
                 if (state.game_type === 'texas') {
@@ -850,9 +856,8 @@
                 } else {
                      if (showAll) oppCards.forEach((c, i) => cardsHtml += renderCard(c, i));
                      else {
-                         // Default hidden
                          if(state.game_type === 'blackjack' && oppCards.length > 0) {
-                              cardsHtml += renderCard(oppCards[0], 0); // 1 visible blackjack
+                              cardsHtml += renderCard(oppCards[0], 0); 
                               for(let i=1; i<oppCards.length; i++) cardsHtml += renderCard(null, i, true);
                          } else {
                               oppCards.forEach((c, i) => cardsHtml += renderCard(null, i, true));
@@ -860,7 +865,6 @@
                      }
                 }
 
-                // SUBTITLE
                 let subtitle = "";
                 if(state.status === 'finished') {
                      if(['poker', 'texas', 'viuda'].includes(state.game_type)) {
@@ -872,7 +876,6 @@
                         subtitle = `<span class="text-xs font-mono bg-black/50 px-2 rounded text-yellow-500">${state.scores[p]}</span>`;
                     }
                 } else {
-                     // Estados intermedios
                      if (state.game_type === 'texas') {
                          if (state.decided_players.includes(p)) {
                               const decision = (state.active_players.includes(p)) ? "VOY" : "NO VOY";
