@@ -1,583 +1,790 @@
-from flask import Flask, request
-from flask_socketio import SocketIO, join_room, emit
-import random
-import string
-import itertools
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Casino Perrón</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-app = Flask(__name__)
-app.config['SECRET_KEY'] = 'casino_perron_secret'
-socketio = SocketIO(app, cors_allowed_origins="*")
-
-rooms = {}
-
-# --- UTILIDADES DE CARTAS ---
-SUITS = ['♠', '♥', '♦', '♣']
-RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
-RANK_VALUES = {r: i for i, r in enumerate(RANKS, 2)}
-RANK_NAMES = {
-    2: 'Doses', 3: 'Treses', 4: 'Cuatros', 5: 'Cincos', 6: 'Seises',
-    7: 'Sietes', 8: 'Ochos', 9: 'Nueves', 10: 'Dieces',
-    11: 'Jotas', 12: 'Reinas', 13: 'Reyes', 14: 'Ases'
-}
-RANK_NAMES_SINGULAR = {
-    2: 'Dos', 3: 'Tres', 4: 'Cuatro', 5: 'Cinco', 6: 'Seis',
-    7: 'Siete', 8: 'Ocho', 9: 'Nueve', 10: 'Diez',
-    11: 'Jota', 12: 'Reina', 13: 'Rey', 14: 'As'
-}
-
-def create_deck():
-    deck = [{'rank': r, 'suit': s} for s in SUITS for r in RANKS]
-    random.shuffle(deck)
-    return deck
-
-# --- LÓGICA DE BLACKJACK ---
-def calculate_blackjack_score(hand):
-    score = 0
-    aces = 0
-    for card in hand:
-        r = card['rank']
-        if r in ['J', 'Q', 'K']:
-            score += 10
-        elif r == 'A':
-            aces += 1
-            score += 11
-        else:
-            score += int(r)
-    while score > 21 and aces > 0:
-        score -= 10
-        aces -= 1
-    return score
-
-class BlackjackGame:
-    def __init__(self):
-        self.deck = create_deck()
-        self.hands = {}
-        self.scores = {}
-        self.turn_index = 0
-        self.players_in_game = []
-        self.status = 'waiting'
-        self.winners = []
-        self.win_reason = "" 
-        self.config = {}
-        self.pot = 0
-        self.bet = 0
-
-    def start_game(self, players, config):
-        self.players_in_game = players
-        self.config = config
-        self.bet = int(config.get('bet', 0))
-        self.pot = self.bet * len(players)
-        
-        self.deck = create_deck()
-        self.hands = {p: [] for p in players}
-        self.scores = {p: 0 for p in players}
-        self.status = 'playing'
-        self.turn_index = 0
-        self.winners = []
-        self.win_reason = ""
-        
-        for _ in range(2):
-            for p in players:
-                if self.deck: self.hands[p].append(self.deck.pop())
-        self.update_scores()
-
-    def update_scores(self):
-        for p in self.players_in_game:
-            self.scores[p] = calculate_blackjack_score(self.hands[p])
-
-    def player_action(self, player, action, data=None):
-        if self.status != 'playing': return
-        current_p = self.players_in_game[self.turn_index]
-        if player != current_p: return
-
-        if action == 'hit':
-            if self.deck:
-                self.hands[player].append(self.deck.pop())
-                self.update_scores()
-                if self.scores[player] > 21:
-                    self.next_turn()
-        elif action == 'stand':
-            self.next_turn()
-        
-        if self.status == 'finished':
-            return 'game_over'
-        return 'update'
-
-    def next_turn(self):
-        self.turn_index = (self.turn_index + 1) % len(self.players_in_game)
-        if self.turn_index == 0: 
-            self.end_round()
-
-    def end_round(self):
-        active = {p: s for p, s in self.scores.items() if s <= 21}
-        if not active:
-            self.status = 'finished'
-            self.winners = []
-            self.win_reason = "Todos se pasaron"
-            return
-
-        quintillas = [p for p in active if len(self.hands[p]) >= 5]
-        if quintillas:
-            candidates = quintillas
-            self.win_reason = "Quintilla (5 cartas)"
-        else:
-            max_s = max(active.values())
-            candidates = [p for p, s in active.items() if s == max_s]
-            self.win_reason = f"Puntaje Alto ({max_s})"
-
-        if len(candidates) > 1:
-            self.win_reason += " + Carta Alta"
-            self.winners = [candidates[0]] 
-        else:
-            self.winners = candidates
-        self.status = 'finished'
-
-    def get_state(self):
-        turn_name = self.players_in_game[self.turn_index] if self.status == 'playing' and self.players_in_game else None
-        return {
-            'status': self.status,
-            'turn': turn_name,
-            'hands': self.hands,
-            'scores': self.scores,
-            'winners': self.winners,
-            'win_reason': self.win_reason,
-            'game_type': 'blackjack',
-            'pot': self.pot,
-            'bet': self.bet
+    <style>
+        body { font-family: 'Lato', sans-serif; background-color: #0f172a; color: #e2e8f0; }
+        h1, h2, h3, .brand-font { font-family: 'Cinzel', serif; }
+        .gold-text {
+            background: linear-gradient(to right, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
+            -webkit-background-clip: text; background-clip: text; color: transparent;
         }
-
-# --- LÓGICA DE POKER GENÉRICA ---
-
-def get_rank_name(val, plural=True):
-    return RANK_NAMES.get(val, str(val)) if plural else RANK_NAMES_SINGULAR.get(val, str(val))
-
-def _eval_standard(cards):
-    values = sorted([RANK_VALUES[c['rank']] for c in cards], reverse=True)
-    suits = [c['suit'] for c in cards]
-    rank_counts = {r: values.count(r) for r in values}
-    sorted_counts = sorted(rank_counts.items(), key=lambda item: (item[1], item[0]), reverse=True)
-    
-    is_flush = len(set(suits)) == 1
-    
-    unique_vals = sorted(list(set(values)))
-    is_straight = False
-    straight_high = 0
-    
-    if len(unique_vals) >= 5:
-        for i in range(len(unique_vals) - 4):
-            if unique_vals[i+4] - unique_vals[i] == 4:
-                is_straight = True
-                straight_high = unique_vals[i+4]
-                break
-        if not is_straight and set([14, 2, 3, 4, 5]).issubset(set(values)):
-            is_straight = True
-            straight_high = 5
-
-    hand_name = ""
-    score = 0
-    tie_breakers = [r for r, count in sorted_counts]
-
-    primary_rank = sorted_counts[0][0]
-    secondary_rank = sorted_counts[1][0] if len(sorted_counts) > 1 else 0
-
-    if is_straight and is_flush:
-        if 14 in values and 13 in values: 
-            hand_name = "Escalera Real"
-            score = 9
-        else: 
-            hand_name = f"Escalera de Color al {get_rank_name(straight_high, False)}"
-            score = 8
-    elif sorted_counts[0][1] == 4:
-        hand_name = f"Poker de {get_rank_name(primary_rank)}"
-        score = 7
-    elif sorted_counts[0][1] == 3 and sorted_counts[1][1] == 2:
-        hand_name = f"Full House ({get_rank_name(primary_rank)} con {get_rank_name(secondary_rank)})"
-        score = 6
-    elif is_flush:
-        hand_name = f"Color al {get_rank_name(values[0], False)}"
-        score = 5
-    elif is_straight:
-        hand_name = f"Escalera al {get_rank_name(straight_high, False)}"
-        score = 4
-    elif sorted_counts[0][1] == 3:
-        hand_name = f"Tercia de {get_rank_name(primary_rank)}"
-        score = 3
-    elif sorted_counts[0][1] == 2 and sorted_counts[1][1] == 2:
-        hand_name = f"Doble Par ({get_rank_name(primary_rank)} y {get_rank_name(secondary_rank)})"
-        score = 2
-    elif sorted_counts[0][1] == 2:
-        hand_name = f"Par de {get_rank_name(primary_rank)}"
-        score = 1
-    else:
-        hand_name = f"Carta Alta ({get_rank_name(values[0], False)})"
-        score = 0
+        .gold-border { border: 2px solid #b38728; box-shadow: 0 0 10px rgba(179, 135, 40, 0.5); }
+        .poker-table {
+            background-color: #35654d;
+            background-image: radial-gradient(#407a5d 20%, transparent 20%), radial-gradient(#407a5d 20%, transparent 20%);
+            background-size: 50px 50px; background-position: 0 0, 25px 25px;
+            border: 15px solid #3e2723; border-radius: 50px;
+            box-shadow: inset 0 0 50px #000;
+        }
+        .card {
+            width: 60px; height: 90px; background: white; border-radius: 5px;
+            display: flex; justify-content: center; items-align: center;
+            font-weight: bold; font-size: 1.2rem; color: black;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5); position: relative;
+            transition: transform 0.2s; user-select: none;
+        }
+        .card.red { color: #d32f2f; }
+        .card.wild { color: #9333ea; border: 2px solid #a855f7; box-shadow: 0 0 10px #a855f7; }
+        .card.hidden-card {
+            background: #b38728;
+            background-image: repeating-linear-gradient(45deg, #aa771c 0, #aa771c 10px, #b38728 10px, #b38728 20px);
+            color: transparent;
+        }
+        .card-btn { transition: all 0.3s ease; cursor: pointer; }
+        .card-btn:hover { transform: translateY(-5px); box-shadow: 0 0 20px rgba(179, 135, 40, 0.4); }
+        .hidden-screen { display: none !important; }
         
-    return (score, tie_breakers, hand_name)
+        .animate-deal { animation: deal 0.5s ease-out forwards; }
+        @keyframes deal { from { transform: translateY(-200px) scale(0.5); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
 
-def eval_poker_hand_5(cards, wild_rank=None):
-    normal_cards = []
-    wild_count = 0
-    
-    for c in cards:
-        if wild_rank and c['rank'] == wild_rank:
-            wild_count += 1
-        else:
-            normal_cards.append(c)
-
-    if wild_count == 0:
-        return _eval_standard(cards)
-    
-    full_deck = [{'rank': r, 'suit': s} for s in SUITS for r in RANKS]
-    available = [c for c in full_deck if not any(nc['rank'] == c['rank'] and nc['suit'] == c['suit'] for nc in normal_cards)]
-    
-    best_hand_val = (-1, [], "")
-    
-    # Solo probar combinaciones necesarias
-    import itertools
-    # Limitar iteraciones si hay demasiados comodines para evitar lag, 
-    # aunque con 5 cartas max 5 wildcards es rapido.
-    for replacement in itertools.combinations(available, wild_count):
-        test_hand = normal_cards + list(replacement)
-        val = _eval_standard(test_hand)
-        if val > best_hand_val:
-            best_hand_val = val
-            
-    return (best_hand_val[0], best_hand_val[1], best_hand_val[2] + " (con Comodín)")
-
-def eval_texas_hand(hole_cards, community_cards):
-    """
-    Evalúa la mejor mano de 5 cartas de las 7 disponibles (2 hole + 5 community).
-    """
-    all_cards = hole_cards + community_cards
-    # Generar todas las combinaciones de 5 cartas
-    best_score = (-1, [], "")
-    
-    # Si hay menos de 5 cartas (no debería pasar al final), evaluar lo que hay
-    if len(all_cards) < 5:
-        return _eval_standard(all_cards)
-
-    for combo in itertools.combinations(all_cards, 5):
-        score = _eval_standard(list(combo))
-        if score > best_score:
-            best_score = score
-            
-    return best_score
-
-
-class PokerGame:
-    def __init__(self):
-        self.deck = []
-        self.hands = {} 
-        self.status = 'waiting'
-        self.players_in_game = []
-        self.players_ready = [] 
-        self.winners = []
-        self.win_reason = ""
-        self.hand_names = {} 
-        self.config = {}
-        self.wild_rank = None
-        self.pot = 0
-        self.bet = 0
-
-    def start_game(self, players, config):
-        self.players_in_game = players
-        self.config = config
-        self.bet = int(config.get('bet', 0))
-        self.pot = self.bet * len(players)
+        .discard-selected {
+            transform: translateY(-20px);
+            opacity: 0.7;
+            border: 2px solid #ef4444; 
+        }
         
-        self.deck = create_deck()
-        self.hands = {p: [] for p in players}
-        self.players_ready = []
-        self.status = 'discard_phase'
-        self.winners = []
-        self.win_reason = ""
-        self.hand_names = {p: "?" for p in players}
-        
-        self.wild_rank = None
-        if config.get('wildcards', False):
-            self.wild_rank = random.choice(RANKS)
-        
-        for _ in range(5):
-            for p in players:
-                if self.deck: self.hands[p].append(self.deck.pop())
+        #chat-messages::-webkit-scrollbar { width: 6px; }
+        #chat-messages::-webkit-scrollbar-track { background: #1e293b; }
+        #chat-messages::-webkit-scrollbar-thumb { background: #ca8a04; border-radius: 3px; }
+    </style>
+</head>
+<body class="bg-slate-950 min-h-screen flex flex-col overflow-hidden">
 
-    def player_action(self, player, action, data=None):
-        if self.status != 'discard_phase': return
+    <!-- Navbar -->
+    <nav class="w-full bg-slate-900 border-b border-yellow-600/30 p-4 flex justify-between items-center z-50">
+        <div class="flex items-center gap-3 cursor-pointer" onclick="location.reload()">
+            <i class="fa-solid fa-crown text-yellow-500 text-2xl"></i>
+            <span class="text-xl font-bold brand-font gold-text">CASINO PERRÓN</span>
+        </div>
+        <div id="connectionStatus" class="text-xs text-red-500 flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div> Offline
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow container mx-auto p-4 flex flex-col justify-center items-center relative">
         
-        if action == 'exchange':
-            if player in self.players_ready: return
+        <!-- SCREEN 1: LANDING -->
+        <div id="screen-landing" class="w-full max-w-md text-center space-y-6">
+            <div class="mb-4">
+                <i class="fa-solid fa-dice text-6xl text-yellow-600 mb-4 block"></i>
+                <h1 class="text-4xl md:text-5xl font-bold text-white mb-2 brand-font">Bienvenido</h1>
+                <p class="text-slate-400">Donde la suerte muerde.</p>
+            </div>
             
-            indices = sorted(data.get('discard_indices', []), reverse=True)
-            current_hand = self.hands[player]
-            
-            for idx in indices:
-                if 0 <= idx < len(current_hand):
-                    current_hand.pop(idx)
-            
-            while len(current_hand) < 5 and self.deck:
-                current_hand.append(self.deck.pop())
+            <div class="bg-slate-900/80 p-8 rounded-xl gold-border backdrop-blur-sm">
+                <label class="block text-left text-yellow-500 mb-2 font-bold">Tu Alias</label>
+                <input type="text" id="usernameInput" placeholder="Ej: El Patrón" class="w-full bg-slate-800 text-white border border-slate-600 rounded p-3 mb-6 focus:outline-none focus:border-yellow-500 transition">
+                <button onclick="goToSelection()" class="w-full bg-gradient-to-r from-yellow-700 to-yellow-500 text-slate-900 font-bold py-3 rounded hover:from-yellow-600 hover:to-yellow-400 transition shadow-lg">
+                    ENTRAR AL CASINO
+                </button>
+            </div>
+        </div>
+
+        <!-- SCREEN 2: GAME SELECTION -->
+        <div id="screen-selection" class="hidden-screen w-full max-w-6xl text-center">
+            <h2 class="text-3xl gold-text mb-8 brand-font">Selecciona tu Mesa</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 
-            self.hands[player] = current_hand
-            self.players_ready.append(player)
-            
-            if len(self.players_ready) >= len(self.players_in_game):
-                self.evaluate_winner()
-                return 'game_over'
-            
-            return 'update'
+                <!-- Blackjack -->
+                <div onclick="selectGame('blackjack')" class="card-btn bg-slate-900 border border-yellow-600 rounded-xl p-6 relative overflow-hidden group">
+                    <div class="absolute inset-0 bg-yellow-500/10 group-hover:bg-yellow-500/20 transition"></div>
+                    <img src="https://img.icons8.com/color/96/blackjack.png" alt="Blackjack" class="mx-auto mb-4 relative z-10 w-16 h-16">
+                    <h3 class="text-xl font-bold text-white relative z-10">21 Blackjack</h3>
+                    <p class="text-xs text-slate-400 mt-2 relative z-10">PvP. Regla Quintilla.</p>
+                </div>
 
-    def evaluate_winner(self):
-        best_score = (-1, [], "")
-        winners = []
-        
-        for p in self.players_in_game:
-            score_tuple = eval_poker_hand_5(self.hands[p], self.wild_rank)
-            self.hand_names[p] = score_tuple[2]
-            
-            if score_tuple > best_score:
-                best_score = score_tuple
-                winners = [p]
-            elif score_tuple == best_score:
-                winners.append(p)
-        
-        self.winners = winners
-        self.win_reason = best_score[2]
-        self.status = 'finished'
+                <!-- Poker -->
+                <div onclick="selectGame('poker')" class="card-btn bg-slate-900 border border-yellow-600 rounded-xl p-6 relative overflow-hidden group">
+                    <div class="absolute inset-0 bg-yellow-500/10 group-hover:bg-yellow-500/20 transition"></div>
+                    <img src="https://img.icons8.com/color/96/poker-hand.png" alt="Poker" class="mx-auto mb-4 w-16 h-16 relative z-10">
+                    <h3 class="text-xl font-bold text-white relative z-10">Póker Draw</h3>
+                    <p class="text-xs text-slate-400 mt-2 relative z-10">5 Cartas. Descarte.</p>
+                </div>
 
-    def get_state(self):
-        return {
-            'status': self.status,
-            'hands': self.hands,
-            'ready_players': self.players_ready,
-            'winners': self.winners,
-            'win_reason': self.win_reason,
-            'hand_names': self.hand_names,
-            'game_type': 'poker',
-            'wild_rank': self.wild_rank,
-            'pot': self.pot,
-            'bet': self.bet
+                <!-- Texas -->
+                <div onclick="selectGame('texas')" class="card-btn bg-slate-900 border border-yellow-600 rounded-xl p-6 relative overflow-hidden group">
+                    <div class="absolute inset-0 bg-yellow-500/10 group-hover:bg-yellow-500/20 transition"></div>
+                    <img src="https://img.icons8.com/color/96/chip.png" alt="Texas" class="mx-auto mb-4 w-16 h-16 relative z-10">
+                    <h3 class="text-xl font-bold text-white relative z-10">Texas Hold'em</h3>
+                    <p class="text-xs text-slate-400 mt-2 relative z-10">2 Cartas + Comunitarias.</p>
+                </div>
+
+                <!-- Others -->
+                <div onclick="alert('Próximamente')" class="card-btn bg-slate-900 border border-slate-700 rounded-xl p-6 relative opacity-75">
+                    <img src="https://img.icons8.com/color/96/spider.png" alt="Viuda" class="mx-auto mb-4 w-16 h-16 grayscale">
+                    <h3 class="text-xl font-bold text-white">Viuda Negra</h3>
+                    <p class="text-xs text-yellow-600 mt-2 font-bold">PRÓXIMAMENTE</p>
+                </div>
+            </div>
+            <button onclick="showScreen('screen-landing')" class="mt-8 text-slate-500 hover:text-white underline">Cerrar Sesión</button>
+        </div>
+
+        <!-- SCREEN 3: LOBBY -->
+        <div id="screen-lobby" class="hidden-screen w-full max-w-md text-center">
+            <h2 id="lobby-title" class="text-3xl text-yellow-500 mb-2 brand-font">Sala</h2>
+            
+            <div id="lobby-controls" class="space-y-4">
+                
+                <!-- Create Options -->
+                <div class="bg-slate-800 p-6 rounded-lg border border-slate-700 hover:border-yellow-500 transition">
+                    <h3 class="text-lg font-bold mb-4">Crear Sala Privada</h3>
+                    
+                    <div class="text-left bg-slate-900 p-3 rounded mb-4 space-y-3">
+                        <div>
+                            <label class="block text-slate-400 text-xs font-bold mb-1">APUESTA INICIAL ($)</label>
+                            <input type="number" id="betInput" value="100" min="0" class="w-full bg-slate-800 text-white border border-slate-600 rounded p-2 text-right font-mono text-yellow-500">
+                        </div>
+
+                        <div id="poker-options" class="hidden">
+                            <label class="flex items-center justify-between cursor-pointer">
+                                <span class="text-white text-sm">¿Comodines Aleatorios?</span>
+                                <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                    <input type="checkbox" id="wildcardToggle" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer checked:right-0 right-5"/>
+                                    <label for="wildcardToggle" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer checked:bg-yellow-500"></label>
+                                </div>
+                            </label>
+                            <p class="text-xs text-slate-500 mt-1">Una carta al azar (ej: 7, K) será el comodín.</p>
+                        </div>
+                    </div>
+
+                    <button onclick="createRoom()" class="w-full bg-yellow-700 hover:bg-yellow-600 text-white font-bold py-2 rounded">
+                        <i class="fa-solid fa-plus-circle mr-2"></i> CREAR
+                    </button>
+                </div>
+
+                <div class="flex items-center justify-center py-2">
+                    <span class="h-px bg-slate-700 w-full"></span><span class="px-2 text-slate-500 text-xs">O</span><span class="h-px bg-slate-700 w-full"></span>
+                </div>
+
+                <div class="bg-slate-800 p-6 rounded-lg border border-slate-700">
+                    <h3 class="text-lg font-bold mb-2">Unirse a Sala</h3>
+                    <div class="flex gap-2">
+                        <input type="text" id="roomCodeInput" placeholder="CÓDIGO" class="w-full bg-slate-900 text-center text-white border border-slate-600 rounded p-2 uppercase tracking-widest">
+                        <button onclick="joinRoom()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 rounded font-bold">IR</button>
+                    </div>
+                </div>
+                
+                <button onclick="showScreen('screen-selection')" class="text-slate-500 hover:text-white underline text-sm">Cambiar Juego</button>
+            </div>
+
+            <div id="lobby-waiting" class="hidden-screen mt-4">
+                <p class="text-xl text-white mb-2">Código: <span id="display-code" class="font-mono bg-slate-800 px-3 py-1 rounded border border-yellow-500/50 text-yellow-400">----</span></p>
+                <p id="game-mode-display" class="text-xs text-yellow-500 mb-4 font-bold uppercase"></p>
+
+                <div class="bg-slate-800/50 p-4 rounded-lg mb-4 text-left">
+                    <h3 class="text-slate-400 text-xs uppercase tracking-widest mb-2 border-b border-slate-700 pb-1">Jugadores</h3>
+                    <ul id="players-list" class="space-y-1 text-sm font-bold"></ul>
+                </div>
+                <button id="btn-start" onclick="startGame()" class="hidden-screen w-full bg-green-700 hover:bg-green-600 text-white font-bold py-3 rounded-lg shadow-lg animate-pulse">
+                    INICIAR PARTIDA
+                </button>
+                <p id="msg-waiting-host" class="text-slate-500 text-xs italic">Esperando al anfitrión...</p>
+            </div>
+        </div>
+
+        <!-- SCREEN 4: GAME TABLE -->
+        <div id="screen-game" class="hidden-screen w-full h-full flex flex-col items-center justify-center pt-4">
+            
+            <div class="w-full max-w-5xl flex justify-between items-start px-2 mb-2">
+                <div class="bg-slate-900/80 px-4 py-1 rounded-full border border-yellow-600/30">
+                     <span class="text-xs text-slate-400 block">POZO TOTAL</span>
+                     <span id="pot-display" class="text-yellow-500 font-mono font-bold text-lg">$0</span>
+                </div>
+                
+                <div id="game-status-bar" class="bg-black/60 px-6 py-2 rounded-full text-yellow-400 font-bold backdrop-blur-sm border border-yellow-600/30 text-sm">
+                    Cargando...
+                </div>
+
+                <div id="wildcard-badge" class="hidden opacity-0 transition-opacity duration-500 flex flex-col items-center">
+                     <div class="bg-purple-900/80 text-purple-200 text-xs px-3 py-1 rounded-t-lg font-bold">COMODÍN</div>
+                     <div id="wild-card-display" class="bg-white text-black font-bold px-3 py-2 rounded-b-lg border-2 border-purple-500 text-xl shadow-[0_0_15px_rgba(168,85,247,0.5)]">
+                         ?
+                     </div>
+                </div>
+            </div>
+
+            <div class="poker-table w-full max-w-5xl flex-grow relative m-2 rounded-[60px] flex flex-col justify-between p-4">
+                
+                <div id="opponents-area" class="flex justify-center gap-4 flex-wrap z-10"></div>
+
+                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <div class="opacity-10 text-4xl md:text-6xl text-black brand-font text-center leading-tight mb-4">CASINO<br>PERRÓN</div>
+                    <!-- Community Cards Container -->
+                    <div id="community-cards-container" class="flex gap-2 h-24 pointer-events-auto"></div>
+                </div>
+
+                <div class="self-center mt-auto flex flex-col items-center relative z-10 mb-2">
+                    <div id="my-score-container" class="flex items-center gap-2 mb-2">
+                        <span class="text-xs text-slate-400 font-bold uppercase">Tu mano</span>
+                        <div id="my-score-bubble" class="bg-slate-900 text-white px-3 py-1 rounded-full text-lg font-bold border border-slate-600 shadow-lg min-w-[40px] text-center">0</div>
+                    </div>
+
+                    <div id="poker-instructions" class="hidden-screen text-yellow-300 text-xs font-bold mb-1 animate-bounce">
+                        <i class="fa-solid fa-arrow-down"></i> Toca las cartas que quieras DESCARTAR
+                    </div>
+
+                    <div class="relative">
+                        <div id="my-hand" class="flex justify-center" style="min-height: 90px;"></div>
+                    </div>
+
+                    <div class="bg-slate-900 px-4 py-1 rounded-xl border-t-2 border-yellow-600 mt-2 shadow-xl flex items-center gap-4">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-user text-yellow-500 text-xs"></i>
+                            <span id="my-name-display" class="font-bold text-white text-sm">Yo</span>
+                        </div>
+                        <div class="border-l border-slate-700 pl-4 text-xs">
+                             <span class="text-slate-400">Apuesta:</span>
+                             <span id="my-bet-display" class="text-green-400 font-mono">$0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONTROLS -->
+            <div id="controls-blackjack" class="w-full max-w-md grid grid-cols-2 gap-4 p-4 hidden-screen">
+                <button onclick="sendAction('hit')" id="btn-hit" class="bg-green-700 text-white py-3 rounded-lg font-bold shadow-lg border-b-4 border-green-900 active:translate-y-1">PEDIR (+1)</button>
+                <button onclick="sendAction('stand')" id="btn-stand" class="bg-red-700 text-white py-3 rounded-lg font-bold shadow-lg border-b-4 border-red-900 active:translate-y-1">PLANTARSE</button>
+            </div>
+
+            <div id="controls-poker" class="w-full max-w-md p-4 hidden-screen">
+                <button onclick="sendPokerExchange()" id="btn-exchange" class="w-full bg-blue-700 hover:bg-blue-600 text-white py-3 rounded-lg font-bold shadow-lg border-b-4 border-blue-900 active:translate-y-1">
+                    CONFIRMAR CAMBIO
+                </button>
+            </div>
+
+            <!-- Texas Hold'em Controls -->
+            <div id="controls-texas" class="w-full max-w-md grid grid-cols-2 gap-4 p-4 hidden-screen">
+                <button onclick="sendAction('call')" id="btn-texas-call" class="bg-green-600 hover:bg-green-500 text-white py-3 rounded-lg font-bold shadow-lg border-b-4 border-green-800 active:translate-y-1 text-sm md:text-base flex flex-col items-center leading-none gap-1">
+                    <span>¡VOY!</span>
+                    <span class="text-[10px] opacity-80">(Igualar Apuesta)</span>
+                </button>
+                <button onclick="sendAction('fold')" id="btn-texas-fold" class="bg-red-700 hover:bg-red-600 text-white py-3 rounded-lg font-bold shadow-lg border-b-4 border-red-900 active:translate-y-1 text-sm md:text-base flex flex-col items-center leading-none gap-1">
+                    <span>NO VOY</span>
+                    <span class="text-[10px] opacity-80">(Retirarse)</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- RESULTS MODAL -->
+        <div id="modal-results" class="hidden-screen fixed inset-0 z-[100] bg-black/90 flex items-center justify-center backdrop-blur-md p-4">
+            <div class="bg-slate-900 p-6 rounded-2xl border-2 border-yellow-500 text-center max-w-sm w-full shadow-[0_0_50px_rgba(234,179,8,0.3)]">
+                <i class="fa-solid fa-trophy text-5xl text-yellow-400 mb-4 animate-bounce"></i>
+                <h2 class="text-3xl brand-font text-white mb-2">RESULTADOS</h2>
+                <div id="results-content" class="text-slate-300 text-base mb-6 space-y-2"></div>
+                <button onclick="exitGameRoom()" class="bg-yellow-600 hover:bg-yellow-500 text-slate-900 font-bold py-2 px-6 rounded-lg w-full">Volver al Menú</button>
+            </div>
+        </div>
+
+        <!-- CHAT SYSTEM -->
+        <button onclick="toggleChat()" class="fixed bottom-4 right-4 bg-yellow-600 text-white w-14 h-14 rounded-full shadow-lg z-50 hover:bg-yellow-500 transition flex items-center justify-center border-2 border-yellow-400">
+            <i class="fa-solid fa-comments text-xl"></i>
+        </button>
+
+        <div id="chat-window" class="fixed bottom-24 right-4 w-80 h-96 bg-slate-900 border-2 border-yellow-600 rounded-xl shadow-2xl z-40 flex flex-col hidden-screen backdrop-blur-md">
+            <div class="bg-slate-800 p-3 rounded-t-lg border-b border-slate-700 flex justify-between items-center">
+                <h3 class="text-yellow-500 font-bold brand-font">Chat de Sala</h3>
+                <button onclick="toggleChat()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div id="chat-messages" class="flex-grow overflow-y-auto p-3 space-y-3 text-sm text-slate-300"></div>
+            <div class="p-3 border-t border-slate-700 bg-slate-800/50 rounded-b-xl">
+                <div class="flex gap-2">
+                    <input type="text" id="chatInput" placeholder="Enviar mensaje..." class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-2 text-white focus:border-yellow-500 outline-none" onkeypress="handleChatKey(event)">
+                    <button onclick="sendChatMessage()" class="bg-yellow-600 text-white px-3 rounded hover:bg-yellow-500"><i class="fa-solid fa-paper-plane"></i></button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        const socket = io('https://casino-cwf2.onrender.com');
+        const SCREENS = ['screen-landing', 'screen-selection', 'screen-lobby', 'screen-game'];
+        let currentState = { 
+            name: "", 
+            room: "", 
+            isHost: false, 
+            gameType: 'blackjack',
+            pokerDiscards: [],
+            wildRank: null
+        };
+        let lastHandSizes = {}; 
+
+        // --- NAVIGATION ---
+        function showScreen(id) {
+            SCREENS.forEach(s => document.getElementById(s).classList.add('hidden-screen'));
+            document.getElementById(id).classList.remove('hidden-screen');
         }
 
-class TexasHoldemGame:
-    def __init__(self):
-        self.deck = []
-        self.hands = {} # Cartas propias (2)
-        self.community_cards = []
-        self.status = 'waiting' # betting_flop, betting_turn, betting_river, finished
-        self.players_in_game = []
-        self.active_players = [] # Jugadores que no se han retirado
-        self.decisions = {} # {player: 'call'/'fold'}
-        self.winners = []
-        self.win_reason = ""
-        self.hand_names = {}
-        self.pot = 0
-        self.initial_bet = 0
-        self.bet = 0
-
-    def start_game(self, players, config):
-        self.players_in_game = players
-        self.active_players = list(players)
-        self.initial_bet = int(config.get('bet', 0))
-        self.bet = self.initial_bet # Apuesta de la ronda actual
-        self.pot = self.initial_bet * len(players) # Ante inicial
-        
-        self.deck = create_deck()
-        self.hands = {p: [] for p in players}
-        self.community_cards = []
-        self.decisions = {}
-        self.winners = []
-        self.hand_names = {p: "?" for p in players}
-        
-        # Repartir 2 cartas a cada jugador
-        for _ in range(2):
-            for p in players:
-                if self.deck: self.hands[p].append(self.deck.pop())
-        
-        # Flop inicial (3 cartas) - Regla especifica del usuario
-        for _ in range(3):
-            if self.deck: self.community_cards.append(self.deck.pop())
-            
-        self.status = 'betting_flop' # Primera ronda de apuestas
-
-    def player_action(self, player, action, data=None):
-        # action: 'call' (Ir) o 'fold' (No Ir)
-        if player not in self.active_players: return
-        if player in self.decisions: return # Ya decidió en esta ronda
-        
-        self.decisions[player] = action
-        
-        if action == 'call':
-            self.pot += self.initial_bet # Apuesta adicional
-        elif action == 'fold':
-            self.active_players.remove(player)
-            # Si se retira, no paga más, pero pierde lo anterior
-            
-        # Checar si todos los activos han decidido
-        if len(self.decisions) >= len(self.active_players) + (len(self.players_in_game) - len(self.active_players)): 
-             # Nota: self.decisions acumula todos, incluso los que se retiraron si lo guardamos,
-             # pero aqui limpiamos decisions por ronda.
-             # Mejor logica: contar decisiones de los activos actuales.
-             decided_active = [p for p in self.active_players if p in self.decisions]
-             if len(decided_active) == len(self.active_players):
-                 self.advance_stage()
-                 if self.status == 'finished':
-                     return 'game_over'
-                 return 'update'
-                 
-        # Victoria por abandono (solo queda 1)
-        if len(self.active_players) == 1:
-            self.end_game_by_fold()
-            return 'game_over'
-
-        return 'update'
-
-    def advance_stage(self):
-        # Resetear decisiones para la siguiente ronda
-        self.decisions = {}
-        
-        if self.status == 'betting_flop':
-            # Revelar Turn (4ta carta)
-            if self.deck: self.community_cards.append(self.deck.pop())
-            self.status = 'betting_turn'
-            
-        elif self.status == 'betting_turn':
-            # Revelar River (5ta carta)
-            if self.deck: self.community_cards.append(self.deck.pop())
-            self.status = 'showdown' # Prompt dice: ver 5ta carta y gana el mejor
-            self.evaluate_winner()
-            
-        elif self.status == 'showdown':
-            # Ya se evaluó
-            pass
-
-    def evaluate_winner(self):
-        best_score = (-1, [], "")
-        winners = []
-        
-        for p in self.active_players:
-            # Evaluar combinando mano + comunitarias
-            score_tuple = eval_texas_hand(self.hands[p], self.community_cards)
-            self.hand_names[p] = score_tuple[2]
-            
-            if score_tuple > best_score:
-                best_score = score_tuple
-                winners = [p]
-            elif score_tuple == best_score:
-                winners.append(p)
-        
-        self.winners = winners
-        self.win_reason = best_score[2]
-        self.status = 'finished'
-
-    def end_game_by_fold(self):
-        self.winners = [self.active_players[0]]
-        self.win_reason = "Los demás se retiraron"
-        self.status = 'finished'
-
-    def get_state(self):
-        return {
-            'status': self.status,
-            'hands': self.hands,
-            'community_cards': self.community_cards,
-            'active_players': self.active_players,
-            'decided_players': list(self.decisions.keys()),
-            'winners': self.winners,
-            'win_reason': self.win_reason,
-            'hand_names': self.hand_names,
-            'game_type': 'texas',
-            'pot': self.pot,
-            'bet': self.initial_bet
+        function goToSelection() {
+            const name = document.getElementById('usernameInput').value.trim();
+            if(!name) return alert("Por favor, ingresa un alias.");
+            currentState.name = name;
+            showScreen('screen-selection');
         }
 
-# --- GESTOR GLOBAL DE SALAS ---
+        function selectGame(game) {
+            currentState.gameType = game;
+            let title = "Sala de Juego";
+            if (game === 'poker') title = 'Sala de Póker';
+            if (game === 'blackjack') title = 'Sala de Blackjack';
+            if (game === 'texas') title = "Sala Texas Hold'em";
+            
+            document.getElementById('lobby-title').textContent = title;
+            
+            if(game === 'poker') {
+                document.getElementById('poker-options').classList.remove('hidden');
+            } else {
+                document.getElementById('poker-options').classList.add('hidden');
+            }
+            
+            showScreen('screen-lobby');
+        }
 
-@app.route('/')
-def index():
-    return "Servidor Casino Perrón Activo"
+        function exitGameRoom() {
+            showScreen('screen-selection');
+            document.getElementById('modal-results').classList.add('hidden-screen');
+            document.getElementById('chat-messages').innerHTML = '';
+        }
 
-@socketio.on('create_room')
-def on_create(data):
-    username = data.get('host')
-    game_type = data.get('game', 'blackjack') 
-    wildcards = data.get('wildcards', False)
-    bet = data.get('bet', 0)
-    
-    room_code = ''.join(random.choices(string.ascii_uppercase, k=4))
-    
-    game_instance = None
-    if game_type == 'poker':
-        game_instance = PokerGame()
-    elif game_type == 'texas':
-        game_instance = TexasHoldemGame()
-    else:
-        game_instance = BlackjackGame()
+        // --- GAME LOGIC ---
 
-    rooms[room_code] = {
-        'host': username,
-        'players': [username],
-        'sockets': {username: request.sid},
-        'game_instance': game_instance,
-        'game_type': game_type,
-        'config': {'wildcards': wildcards, 'bet': bet}
-    }
-    
-    join_room(room_code)
-    emit('room_created', {'room_id': room_code, 'host': username, 'game_type': game_type}, room=request.sid)
-    emit('update_players', {'players': [username], 'host': username}, room=room_code)
+        function createRoom() {
+            const wildcards = document.getElementById('wildcardToggle').checked;
+            const bet = document.getElementById('betInput').value;
+            socket.emit('create_room', { 
+                host: currentState.name, 
+                game: currentState.gameType,
+                wildcards: (currentState.gameType === 'poker' && wildcards),
+                bet: bet
+            });
+        }
 
-@socketio.on('join_room')
-def on_join(data):
-    room_code = data.get('room')
-    username = data.get('player')
-    
-    if room_code not in rooms:
-        emit('error', 'Sala no encontrada', room=request.sid)
-        return
-    
-    room = rooms[room_code]
-    if username in room['players']:
-        emit('error', 'Nombre en uso', room=request.sid)
-        return
+        function joinRoom() {
+            const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+            if(!code) return alert("Ingresa código");
+            socket.emit('join_room', { player: currentState.name, room: code });
+            document.getElementById('chat-messages').innerHTML = '';
+        }
 
-    room['players'].append(username)
-    room['sockets'][username] = request.sid
-    join_room(room_code)
-    
-    emit('joined_room', {'room_id': room_code, 'host': room['host'], 'game_type': room['game_type']}, room=request.sid)
-    emit('update_players', {'players': room['players'], 'host': room['host']}, room=room_code)
+        function startGame() {
+            socket.emit('start_game', { room: currentState.room });
+            lastHandSizes = {}; 
+            currentState.pokerDiscards = []; 
+        }
 
-@socketio.on('start_game')
-def on_start(data):
-    room_code = data.get('room')
-    if room_code in rooms:
-        room = rooms[room_code]
-        room['game_instance'].start_game(room['players'], room['config'])
-        emit('game_started', room['game_instance'].get_state(), room=room_code)
+        function sendAction(action) {
+            socket.emit('player_action', { 
+                room: currentState.room, 
+                player: currentState.name, 
+                action: action 
+            });
+            // Disable buttons locally for instant feedback
+            if(currentState.gameType === 'texas') {
+                document.getElementById('btn-texas-call').disabled = true;
+                document.getElementById('btn-texas-call').classList.add('opacity-50');
+                document.getElementById('btn-texas-fold').disabled = true;
+                document.getElementById('btn-texas-fold').classList.add('opacity-50');
+            }
+        }
+        
+        function toggleDiscard(index) {
+            if(currentState.gameType !== 'poker') return;
+            const cardEl = document.getElementById(`my-card-${index}`);
+            if(currentState.pokerDiscards.includes(index)) {
+                currentState.pokerDiscards = currentState.pokerDiscards.filter(i => i !== index);
+                cardEl.classList.remove('discard-selected');
+            } else {
+                currentState.pokerDiscards.push(index);
+                cardEl.classList.add('discard-selected');
+            }
+            const btn = document.getElementById('btn-exchange');
+            if(currentState.pokerDiscards.length > 0) {
+                btn.textContent = `CAMBIAR ${currentState.pokerDiscards.length} CARTAS`;
+            } else {
+                btn.textContent = "NO CAMBIAR NADA (SERVIDO)";
+            }
+        }
 
-@socketio.on('player_action')
-def on_action(data):
-    room_code = data.get('room')
-    action = data.get('action')
-    player = data.get('player')
-    extra_data = data.get('data', {})
-    
-    if room_code in rooms:
-        room = rooms[room_code]
-        game = room['game_instance']
-        result = game.player_action(player, action, extra_data)
-        state = game.get_state()
-        if result == 'game_over':
-            emit('game_over', state, room=room_code)
-        elif result == 'update':
-            emit('update_game_state', state, room=room_code)
+        function sendPokerExchange() {
+            socket.emit('player_action', {
+                room: currentState.room,
+                player: currentState.name,
+                action: 'exchange',
+                data: { discard_indices: currentState.pokerDiscards }
+            });
+            document.getElementById('btn-exchange').disabled = true;
+            document.getElementById('btn-exchange').textContent = "ESPERANDO RIVALES...";
+            document.getElementById('poker-instructions').classList.add('hidden-screen');
+        }
 
-@socketio.on('send_message')
-def on_send_message(data):
-    room = data.get('room')
-    player = data.get('player')
-    message = data.get('message')
-    if room in rooms:
-        emit('chat_message', {'player': player, 'message': message}, room=room)
+        // --- CHAT LOGIC ---
+        function toggleChat() {
+            const win = document.getElementById('chat-window');
+            win.classList.toggle('hidden-screen');
+        }
 
-if __name__ == '__main__':
-    socketio.run(app, debug=True, port=5000)
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const msg = input.value.trim();
+            if(!msg) return;
+            socket.emit('send_message', { room: currentState.room, player: currentState.name, message: msg });
+            input.value = "";
+        }
+
+        function handleChatKey(e) {
+            if(e.key === 'Enter') sendChatMessage();
+        }
+
+        // --- SOCKET LISTENERS ---
+
+        socket.on('chat_message', (data) => {
+            const chat = document.getElementById('chat-messages');
+            const isMe = data.player === currentState.name;
+            const msgHtml = `
+                <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} animate-deal">
+                    <span class="text-[10px] ${isMe ? 'text-yellow-600' : 'text-slate-500'} font-bold mb-0.5">${data.player}</span>
+                    <div class="${isMe ? 'bg-yellow-900/30 border-yellow-600/50 text-yellow-100' : 'bg-slate-800 border-slate-600 text-slate-200'} border px-3 py-1.5 rounded-lg max-w-[90%] break-words shadow-sm text-xs">
+                        ${data.message}
+                    </div>
+                </div>
+            `;
+            chat.insertAdjacentHTML('beforeend', msgHtml);
+            chat.scrollTop = chat.scrollHeight; 
+        });
+
+        socket.on('room_created', (data) => {
+            currentState.room = data.room_id;
+            currentState.isHost = true;
+            currentState.gameType = data.game_type;
+            setupLobbyUI();
+        });
+
+        socket.on('joined_room', (data) => {
+            currentState.room = data.room_id;
+            currentState.isHost = false;
+            currentState.gameType = data.game_type;
+            setupLobbyUI();
+        });
+
+        socket.on('update_players', (data) => {
+            const list = document.getElementById('players-list');
+            list.innerHTML = "";
+            data.players.forEach(p => {
+                list.innerHTML += `<li class="flex justify-between text-slate-300">
+                    <span>${p}</span> 
+                    ${p === data.host ? '<i class="fa-solid fa-crown text-yellow-500"></i>' : ''}
+                </li>`;
+            });
+
+            if(currentState.name === data.host) {
+                document.getElementById('btn-start').classList.remove('hidden-screen');
+                document.getElementById('msg-waiting-host').classList.add('hidden-screen');
+            } else {
+                document.getElementById('btn-start').classList.add('hidden-screen');
+                document.getElementById('msg-waiting-host').classList.remove('hidden-screen');
+            }
+        });
+
+        socket.on('game_started', (state) => {
+            lastHandSizes = {}; 
+            currentState.pokerDiscards = [];
+            currentState.wildRank = state.wild_rank;
+            showScreen('screen-game');
+            setupGameUI(state); 
+            updateTable(state);
+        });
+
+        socket.on('update_game_state', updateTable);
+        
+        socket.on('game_over', (state) => {
+            updateTable(state);
+            setTimeout(() => showResults(state), 1500);
+        });
+
+        // --- UI HELPERS ---
+
+        function setupLobbyUI() {
+            document.getElementById('lobby-controls').classList.add('hidden-screen');
+            document.getElementById('lobby-waiting').classList.remove('hidden-screen');
+            document.getElementById('display-code').textContent = currentState.room;
+            document.getElementById('game-mode-display').textContent = currentState.gameType.toUpperCase();
+        }
+
+        function setupGameUI(state) {
+            document.getElementById('pot-display').textContent = "$" + state.pot;
+            document.getElementById('my-bet-display').textContent = "$" + state.bet;
+
+            const badge = document.getElementById('wildcard-badge');
+            if(state.wild_rank) {
+                badge.classList.remove('hidden', 'opacity-0');
+                document.getElementById('wild-card-display').textContent = state.wild_rank;
+            } else {
+                badge.classList.add('hidden', 'opacity-0');
+            }
+
+            // Hide all controls first
+            document.getElementById('controls-blackjack').classList.add('hidden-screen');
+            document.getElementById('controls-poker').classList.add('hidden-screen');
+            document.getElementById('controls-texas').classList.add('hidden-screen');
+            document.getElementById('poker-instructions').classList.add('hidden-screen');
+            document.getElementById('my-score-container').classList.add('hidden-screen'); 
+
+            if(state.game_type === 'blackjack') {
+                document.getElementById('controls-blackjack').classList.remove('hidden-screen');
+                document.getElementById('my-score-container').classList.remove('hidden-screen'); 
+            } else if (state.game_type === 'poker') {
+                document.getElementById('controls-poker').classList.remove('hidden-screen');
+                document.getElementById('btn-exchange').disabled = false;
+                document.getElementById('btn-exchange').textContent = "NO CAMBIAR NADA (SERVIDO)";
+                document.getElementById('poker-instructions').classList.remove('hidden-screen');
+            } else if (state.game_type === 'texas') {
+                document.getElementById('controls-texas').classList.remove('hidden-screen');
+                // Texas buttons need to be managed by round status
+            }
+        }
+
+        function renderCard(card, idx, isHidden=false, isClickable=false) {
+            if(isHidden) {
+                return `<div class="card hidden-card" style="margin-left: -30px;"></div>`;
+            }
+            const color = (card.suit === '♥' || card.suit === '♦') ? 'red' : 'black';
+            const isWild = (currentState.wildRank && card.rank === currentState.wildRank);
+            
+            return `
+                <div id="${isClickable ? 'my-card-'+idx : ''}" class="card ${color} ${isWild ? 'wild' : ''} ${isClickable ? 'cursor-pointer hover:mt-[-10px]' : ''}" 
+                     style="margin-left: -30px;" 
+                     ${isClickable ? `onclick="toggleDiscard(${idx})"` : ''}>
+                    <div class="absolute top-1 left-1 text-xs">${card.rank}</div>
+                    <div class="text-xl">${card.suit}</div>
+                    <div class="absolute bottom-1 right-1 text-xs transform rotate-180">${card.rank}</div>
+                    ${isWild ? '<div class="absolute inset-0 flex items-center justify-center text-purple-500 opacity-20 text-4xl font-bold">★</div>' : ''}
+                </div>
+            `;
+        }
+        
+        function renderCommunityCard(card, idx) {
+             const color = (card.suit === '♥' || card.suit === '♦') ? 'red' : 'black';
+             return `
+                <div class="card ${color} animate-deal" style="margin: 0; animation-delay: ${idx * 0.1}s">
+                    <div class="absolute top-1 left-1 text-xs">${card.rank}</div>
+                    <div class="text-xl">${card.suit}</div>
+                    <div class="absolute bottom-1 right-1 text-xs transform rotate-180">${card.rank}</div>
+                </div>
+             `;
+        }
+
+        function updateTable(state) {
+            const bar = document.getElementById('game-status-bar');
+            document.getElementById('pot-display').textContent = "$" + state.pot;
+
+            // --- STATUS & CONTROLS ---
+            if(state.game_type === 'blackjack') {
+                if(state.turn === currentState.name) {
+                    bar.textContent = "¡TU TURNO!";
+                    bar.className = "bg-green-600 px-6 py-2 rounded-full text-white font-bold mb-2 animate-pulse";
+                    document.getElementById('btn-hit').disabled = false;
+                    document.getElementById('btn-stand').disabled = false;
+                } else {
+                    bar.textContent = `Turno de: ${state.turn || 'Nadie'}`;
+                    bar.className = "bg-black/60 px-6 py-2 rounded-full text-white font-bold mb-2";
+                    document.getElementById('btn-hit').disabled = true;
+                    document.getElementById('btn-stand').disabled = true;
+                }
+            } else if (state.game_type === 'poker') {
+                if(state.status === 'discard_phase') {
+                    if(state.ready_players && state.ready_players.includes(currentState.name)) {
+                        bar.textContent = "ESPERANDO A LOS DEMÁS...";
+                        bar.className = "bg-blue-900 px-6 py-2 rounded-full text-white font-bold mb-2 animate-pulse";
+                    } else {
+                        bar.textContent = "ELIGE CARTAS PARA CAMBIAR";
+                        bar.className = "bg-green-600 px-6 py-2 rounded-full text-white font-bold mb-2";
+                    }
+                } else {
+                    bar.textContent = "PARTIDA TERMINADA";
+                    bar.className = "bg-yellow-600 px-6 py-2 rounded-full text-black font-bold mb-2";
+                }
+            } else if (state.game_type === 'texas') {
+                const myDecided = state.decided_players.includes(currentState.name);
+                const amIActive = state.active_players.includes(currentState.name);
+                
+                if (state.status === 'finished') {
+                    bar.textContent = "PARTIDA TERMINADA";
+                    bar.className = "bg-yellow-600 px-6 py-2 rounded-full text-black font-bold mb-2";
+                } else if (!amIActive) {
+                    bar.textContent = "TE HAS RETIRADO";
+                    bar.className = "bg-red-900/50 px-6 py-2 rounded-full text-red-200 font-bold mb-2";
+                    document.getElementById('btn-texas-call').disabled = true;
+                    document.getElementById('btn-texas-fold').disabled = true;
+                    document.getElementById('controls-texas').classList.add('opacity-50');
+                } else if (myDecided) {
+                    bar.textContent = "ESPERANDO RIVALES...";
+                    bar.className = "bg-blue-900 px-6 py-2 rounded-full text-white font-bold mb-2 animate-pulse";
+                    document.getElementById('btn-texas-call').disabled = true;
+                    document.getElementById('btn-texas-fold').disabled = true;
+                    document.getElementById('btn-texas-call').classList.add('opacity-50');
+                    document.getElementById('btn-texas-fold').classList.add('opacity-50');
+                } else {
+                    bar.textContent = "¿VAS O NO VAS?";
+                    bar.className = "bg-green-600 px-6 py-2 rounded-full text-white font-bold mb-2 animate-pulse";
+                    document.getElementById('btn-texas-call').disabled = false;
+                    document.getElementById('btn-texas-fold').disabled = false;
+                    document.getElementById('btn-texas-call').classList.remove('opacity-50');
+                    document.getElementById('btn-texas-fold').classList.remove('opacity-50');
+                }
+                
+                // Render Community Cards
+                const commContainer = document.getElementById('community-cards-container');
+                let commHtml = "";
+                if (state.community_cards) {
+                    state.community_cards.forEach((c, i) => {
+                        commHtml += renderCommunityCard(c, i);
+                    });
+                }
+                commContainer.innerHTML = commHtml;
+            }
+
+            // MY HAND
+            const myCards = state.hands[currentState.name] || [];
+            let myHandHtml = "";
+            myCards.forEach((c, i) => {
+                const clickable = (state.game_type === 'poker' && state.status === 'discard_phase' && !state.ready_players.includes(currentState.name));
+                myHandHtml += renderCard(c, i, false, clickable);
+            });
+            document.getElementById('my-hand').innerHTML = myHandHtml;
+
+            if(state.game_type === 'blackjack') {
+                document.getElementById('my-score-bubble').textContent = state.scores[currentState.name];
+            }
+
+            // OPPONENTS
+            const oppArea = document.getElementById('opponents-area');
+            oppArea.innerHTML = "";
+            const allPlayers = Object.keys(state.hands);
+            
+            allPlayers.forEach(p => {
+                if(p === currentState.name) return;
+                
+                const oppCards = state.hands[p] || [];
+                let cardsHtml = "";
+                
+                // --- VISIBILIDAD DE CARTAS OPONENTES ---
+                let showAll = false;
+                if (state.status === 'finished') showAll = true;
+                
+                if (state.game_type === 'texas') {
+                    // Si se retiró, a veces no se muestra nada o se ve borroso.
+                    // Si es finished, mostramos si sigue activo.
+                    const isActive = state.active_players && state.active_players.includes(p);
+                    if (!isActive && state.status !== 'finished') {
+                        // Jugador retirado durante el juego
+                        cardsHtml = `<div class="text-xs text-red-400 font-bold mt-4">SE RETIRÓ</div>`;
+                    } else {
+                        // Activo
+                        if (showAll) {
+                            oppCards.forEach((c, i) => cardsHtml += renderCard(c, i));
+                        } else {
+                            oppCards.forEach((c, i) => cardsHtml += renderCard(null, i, true));
+                        }
+                    }
+                } else if(state.game_type === 'poker') {
+                    if(showAll) {
+                        oppCards.forEach((c, i) => cardsHtml += renderCard(c, i));
+                    } else {
+                        oppCards.forEach((c, i) => cardsHtml += renderCard(null, i, true));
+                    }
+                } else {
+                    // Blackjack
+                    if(showAll) {
+                        oppCards.forEach((c, i) => cardsHtml += renderCard(c, i));
+                    } else {
+                        if(oppCards.length > 0) {
+                            cardsHtml += renderCard(oppCards[0], 0);
+                            for(let i=1; i<oppCards.length; i++) cardsHtml += renderCard(null, i, true);
+                        }
+                    }
+                }
+
+                // SUBTITLE
+                let subtitle = "";
+                if(state.status === 'finished') {
+                     if(state.game_type === 'poker' || state.game_type === 'texas') {
+                        let shortName = state.hand_names[p] || '';
+                        if (!shortName && state.game_type === 'texas' && !state.active_players.includes(p)) shortName = "Retirado";
+                        if(shortName.length > 15) shortName = shortName.substring(0, 15) + "...";
+                        subtitle = `<span class="text-[10px] text-yellow-400 font-bold block leading-tight">${shortName}</span>`;
+                    } else {
+                        subtitle = `<span class="text-xs font-mono bg-black/50 px-2 rounded text-yellow-500">${state.scores[p]}</span>`;
+                    }
+                } else {
+                     if(state.game_type === 'poker' && state.ready_players && state.ready_players.includes(p)) {
+                         subtitle = `<span class="text-[10px] text-green-400 font-bold"><i class="fa-solid fa-check"></i> LISTO</span>`;
+                     } else if (state.game_type === 'texas') {
+                         if (state.decided_players.includes(p)) {
+                              const decision = (state.active_players.includes(p)) ? "VOY" : "NO VOY";
+                              const color = (decision === "VOY") ? "text-green-400" : "text-red-400";
+                              subtitle = `<span class="text-[10px] ${color} font-bold">${decision}</span>`;
+                         } else {
+                              subtitle = `<span class="text-[10px] text-slate-500 italic">Pensando...</span>`;
+                         }
+                     } else {
+                         subtitle = `<span class="text-[10px] text-slate-500 italic">Pensando...</span>`;
+                     }
+                }
+
+                if (cardsHtml !== "") {
+                    oppArea.innerHTML += `
+                        <div class="flex flex-col items-center bg-slate-900/80 p-2 rounded-lg border border-slate-700 relative">
+                            <div class="flex pl-6 mb-1 transform scale-75 origin-top relative z-10">${cardsHtml}</div>
+                            <div class="flex flex-col items-center justify-center w-full px-1 mt-1">
+                                <span class="text-xs text-slate-300 font-bold truncate max-w-[80px]">${p}</span>
+                                ${subtitle}
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        function showResults(state) {
+            const el = document.getElementById('modal-results');
+            const content = document.getElementById('results-content');
+            el.classList.remove('hidden-screen');
+            
+            let html = "";
+            if(state.winners.includes(currentState.name)) {
+                html += `
+                    <p class="text-green-400 font-bold text-2xl mb-2">¡GANASTE!</p>
+                    <p class="text-yellow-500 text-lg mb-2">Te llevas el pozo: $${state.pot}</p>
+                `;
+            } else if (state.winners.length > 0) {
+                html += `<p class="text-white mb-2">Ganador: <span class="text-yellow-400 font-bold">${state.winners.join(', ')}</span></p>`;
+            } else {
+                html += `<p class="text-red-400 font-bold text-xl">NADIE GANA</p>`;
+            }
+
+            html += `<p class="text-sm text-slate-400 italic">${state.win_reason}</p>`;
+            
+            if((state.game_type === 'poker' || state.game_type === 'texas') && state.hand_names) {
+                const myHandName = state.hand_names[currentState.name] || (state.active_players && !state.active_players.includes(currentState.name) ? "Te Retiraste" : "");
+                if (myHandName) {
+                    html += `<div class="mt-4 bg-slate-800 p-3 rounded text-sm text-slate-300 border border-slate-600">
+                        <p class="text-xs text-slate-500 uppercase font-bold mb-1">Tu Jugada</p>
+                        <span class="text-white font-bold text-lg">${myHandName}</span>
+                    </div>`;
+                }
+            }
+
+            content.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
