@@ -50,6 +50,15 @@
             opacity: 0.7;
             border: 2px solid #ef4444; 
         }
+
+        .swap-hand-selected {
+             transform: translateY(-15px);
+             border: 2px solid #ef4444;
+        }
+        .swap-comm-selected {
+             transform: translateY(15px);
+             border: 2px solid #3b82f6;
+        }
         
         #chat-messages::-webkit-scrollbar { width: 6px; }
         #chat-messages::-webkit-scrollbar-track { background: #1e293b; }
@@ -118,11 +127,12 @@
                     <p class="text-xs text-slate-400 mt-2 relative z-10">2 Cartas + Comunitarias.</p>
                 </div>
 
-                <!-- Others -->
-                <div onclick="alert('Próximamente')" class="card-btn bg-slate-900 border border-slate-700 rounded-xl p-6 relative opacity-75">
-                    <img src="https://img.icons8.com/color/96/spider.png" alt="Viuda" class="mx-auto mb-4 w-16 h-16 grayscale">
-                    <h3 class="text-xl font-bold text-white">Viuda Negra</h3>
-                    <p class="text-xs text-yellow-600 mt-2 font-bold">PRÓXIMAMENTE</p>
+                <!-- Viuda -->
+                <div onclick="selectGame('viuda')" class="card-btn bg-slate-900 border border-yellow-600 rounded-xl p-6 relative overflow-hidden group">
+                     <div class="absolute inset-0 bg-yellow-500/10 group-hover:bg-yellow-500/20 transition"></div>
+                    <img src="https://img.icons8.com/color/96/spider.png" alt="Viuda" class="mx-auto mb-4 w-16 h-16 relative z-10">
+                    <h3 class="text-xl font-bold text-white relative z-10">Viuda Negra</h3>
+                    <p class="text-xs text-slate-400 mt-2 relative z-10">Intercambio y Toque.</p>
                 </div>
             </div>
             <button onclick="showScreen('screen-landing')" class="mt-8 text-slate-500 hover:text-white underline">Cerrar Sesión</button>
@@ -217,8 +227,8 @@
                 <div id="opponents-area" class="flex justify-center gap-4 flex-wrap z-10"></div>
 
                 <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <div class="opacity-10 text-4xl md:text-6xl text-black brand-font text-center leading-tight mb-4">CASINO<br>PERRÓN</div>
-                    <!-- Community Cards Container -->
+                    <div id="center-logo" class="opacity-10 text-4xl md:text-6xl text-black brand-font text-center leading-tight mb-4">CASINO<br>PERRÓN</div>
+                    <!-- Community Cards Container (Shared for Texas & Viuda) -->
                     <div id="community-cards-container" class="flex gap-2 h-24 pointer-events-auto"></div>
                 </div>
 
@@ -261,16 +271,33 @@
                 </button>
             </div>
 
-            <!-- Texas Hold'em Controls -->
             <div id="controls-texas" class="w-full max-w-md grid grid-cols-2 gap-4 p-4 hidden-screen">
                 <button onclick="sendAction('call')" id="btn-texas-call" class="bg-green-600 hover:bg-green-500 text-white py-3 rounded-lg font-bold shadow-lg border-b-4 border-green-800 active:translate-y-1 text-sm md:text-base flex flex-col items-center leading-none gap-1">
-                    <span>¡VOY!</span>
-                    <span class="text-[10px] opacity-80">(Igualar Apuesta)</span>
+                    <span>¡VOY!</span><span class="text-[10px] opacity-80">(Igualar Apuesta)</span>
                 </button>
                 <button onclick="sendAction('fold')" id="btn-texas-fold" class="bg-red-700 hover:bg-red-600 text-white py-3 rounded-lg font-bold shadow-lg border-b-4 border-red-900 active:translate-y-1 text-sm md:text-base flex flex-col items-center leading-none gap-1">
-                    <span>NO VOY</span>
-                    <span class="text-[10px] opacity-80">(Retirarse)</span>
+                    <span>NO VOY</span><span class="text-[10px] opacity-80">(Retirarse)</span>
                 </button>
+            </div>
+
+            <!-- VIUDA CONTROLS -->
+            <div id="controls-viuda" class="w-full max-w-md p-4 hidden-screen space-y-2">
+                <!-- Host Selection -->
+                <div id="viuda-host-opts" class="hidden-screen grid grid-cols-2 gap-4">
+                    <button onclick="sendAction('keep_hand')" class="bg-slate-600 hover:bg-slate-500 text-white py-3 rounded-lg font-bold shadow-lg">ME QUEDO MI MANO</button>
+                    <button onclick="sendAction('take_widow')" class="bg-purple-700 hover:bg-purple-600 text-white py-3 rounded-lg font-bold shadow-lg">QUIERO LA VIUDA</button>
+                </div>
+                <!-- Buy Offer -->
+                <div id="viuda-buy-opts" class="hidden-screen grid grid-cols-2 gap-4">
+                    <button onclick="sendAction('pass_widow')" class="bg-slate-600 hover:bg-slate-500 text-white py-3 rounded-lg font-bold shadow-lg">PASAR</button>
+                    <button onclick="sendAction('buy_widow')" class="bg-green-700 hover:bg-green-600 text-white py-3 rounded-lg font-bold shadow-lg">COMPRAR ($)</button>
+                </div>
+                <!-- Gameplay -->
+                <div id="viuda-play-opts" class="hidden-screen grid grid-cols-3 gap-2">
+                     <button onclick="sendViudaSwap1()" id="btn-swap-1" class="bg-blue-600 text-white py-3 rounded-lg font-bold text-xs disabled:opacity-50">CAMBIAR 1</button>
+                     <button onclick="sendAction('swap_all')" id="btn-swap-all" class="bg-purple-600 text-white py-3 rounded-lg font-bold text-xs">CAMBIAR 5</button>
+                     <button onclick="sendAction('knock')" id="btn-knock" class="bg-yellow-600 text-white py-3 rounded-lg font-bold text-xs">TOCAR</button>
+                </div>
             </div>
         </div>
 
@@ -314,7 +341,8 @@
             isHost: false, 
             gameType: 'blackjack',
             pokerDiscards: [],
-            wildRank: null
+            wildRank: null,
+            viudaSwap: { handIdx: null, commIdx: null }
         };
         let lastHandSizes = {}; 
 
@@ -337,6 +365,7 @@
             if (game === 'poker') title = 'Sala de Póker';
             if (game === 'blackjack') title = 'Sala de Blackjack';
             if (game === 'texas') title = "Sala Texas Hold'em";
+            if (game === 'viuda') title = "Sala Viuda Negra";
             
             document.getElementById('lobby-title').textContent = title;
             
@@ -387,7 +416,6 @@
                 player: currentState.name, 
                 action: action 
             });
-            // Disable buttons locally for instant feedback
             if(currentState.gameType === 'texas') {
                 document.getElementById('btn-texas-call').disabled = true;
                 document.getElementById('btn-texas-call').classList.add('opacity-50');
@@ -424,6 +452,43 @@
             document.getElementById('btn-exchange').disabled = true;
             document.getElementById('btn-exchange').textContent = "ESPERANDO RIVALES...";
             document.getElementById('poker-instructions').classList.add('hidden-screen');
+        }
+
+        // --- VIUDA LOGIC ---
+        function selectSwapCard(idx, type) {
+            if (currentState.gameType !== 'viuda') return;
+            
+            // UI Toggle
+            if (type === 'hand') {
+                // Clear previous hand selection
+                for(let i=0; i<5; i++) {
+                     const el = document.getElementById(`my-card-${i}`);
+                     if(el) el.classList.remove('swap-hand-selected');
+                }
+                currentState.viudaSwap.handIdx = idx;
+                document.getElementById(`my-card-${idx}`).classList.add('swap-hand-selected');
+            } else if (type === 'comm') {
+                // Clear previous comm selection
+                for(let i=0; i<5; i++) {
+                     const el = document.getElementById(`comm-card-${i}`);
+                     if(el) el.classList.remove('swap-comm-selected');
+                }
+                currentState.viudaSwap.commIdx = idx;
+                document.getElementById(`comm-card-${idx}`).classList.add('swap-comm-selected');
+            }
+        }
+
+        function sendViudaSwap1() {
+             if (currentState.viudaSwap.handIdx === null || currentState.viudaSwap.commIdx === null) {
+                 return alert("Selecciona una carta de tu mano y una del centro");
+             }
+             socket.emit('player_action', {
+                room: currentState.room,
+                player: currentState.name,
+                action: 'swap_1',
+                data: { hand_idx: currentState.viudaSwap.handIdx, comm_idx: currentState.viudaSwap.commIdx }
+            });
+            currentState.viudaSwap = { handIdx: null, commIdx: null };
         }
 
         // --- CHAT LOGIC ---
@@ -498,6 +563,7 @@
             lastHandSizes = {}; 
             currentState.pokerDiscards = [];
             currentState.wildRank = state.wild_rank;
+            currentState.viudaSwap = { handIdx: null, commIdx: null };
             showScreen('screen-game');
             setupGameUI(state); 
             updateTable(state);
@@ -531,12 +597,17 @@
                 badge.classList.add('hidden', 'opacity-0');
             }
 
-            // Hide all controls first
+            // Hide all controls
             document.getElementById('controls-blackjack').classList.add('hidden-screen');
             document.getElementById('controls-poker').classList.add('hidden-screen');
             document.getElementById('controls-texas').classList.add('hidden-screen');
+            document.getElementById('controls-viuda').classList.add('hidden-screen');
             document.getElementById('poker-instructions').classList.add('hidden-screen');
             document.getElementById('my-score-container').classList.add('hidden-screen'); 
+            
+            document.getElementById('viuda-host-opts').classList.add('hidden-screen');
+            document.getElementById('viuda-buy-opts').classList.add('hidden-screen');
+            document.getElementById('viuda-play-opts').classList.add('hidden-screen');
 
             if(state.game_type === 'blackjack') {
                 document.getElementById('controls-blackjack').classList.remove('hidden-screen');
@@ -548,21 +619,26 @@
                 document.getElementById('poker-instructions').classList.remove('hidden-screen');
             } else if (state.game_type === 'texas') {
                 document.getElementById('controls-texas').classList.remove('hidden-screen');
-                // Texas buttons need to be managed by round status
+            } else if (state.game_type === 'viuda') {
+                document.getElementById('controls-viuda').classList.remove('hidden-screen');
+                // Controls managed by state status in updateTable
             }
         }
 
-        function renderCard(card, idx, isHidden=false, isClickable=false) {
+        function renderCard(card, idx, isHidden=false, isClickable=false, onClickFn='') {
             if(isHidden) {
                 return `<div class="card hidden-card" style="margin-left: -30px;"></div>`;
             }
             const color = (card.suit === '♥' || card.suit === '♦') ? 'red' : 'black';
             const isWild = (currentState.wildRank && card.rank === currentState.wildRank);
             
+            const onclickAttr = onClickFn ? `onclick="${onClickFn}"` : (isClickable ? `onclick="toggleDiscard(${idx})"` : '');
+            
             return `
-                <div id="${isClickable ? 'my-card-'+idx : ''}" class="card ${color} ${isWild ? 'wild' : ''} ${isClickable ? 'cursor-pointer hover:mt-[-10px]' : ''}" 
+                <div id="${onClickFn ? (onClickFn.includes('comm') ? 'comm-card-'+idx : 'my-card-'+idx) : (isClickable ? 'my-card-'+idx : '')}" 
+                     class="card ${color} ${isWild ? 'wild' : ''} ${isClickable || onClickFn ? 'cursor-pointer hover:mt-[-10px]' : ''}" 
                      style="margin-left: -30px;" 
-                     ${isClickable ? `onclick="toggleDiscard(${idx})"` : ''}>
+                     ${onclickAttr}>
                     <div class="absolute top-1 left-1 text-xs">${card.rank}</div>
                     <div class="text-xl">${card.suit}</div>
                     <div class="absolute bottom-1 right-1 text-xs transform rotate-180">${card.rank}</div>
@@ -571,10 +647,14 @@
             `;
         }
         
-        function renderCommunityCard(card, idx) {
+        function renderCommunityCard(card, idx, isViuda=false) {
              const color = (card.suit === '♥' || card.suit === '♦') ? 'red' : 'black';
+             const clickFn = isViuda ? `onclick="selectSwapCard(${idx}, 'comm')"` : '';
+             const cursor = isViuda ? 'cursor-pointer hover:mb-2' : '';
+             const idAttr = isViuda ? `id="comm-card-${idx}"` : '';
+             
              return `
-                <div class="card ${color} animate-deal" style="margin: 0; animation-delay: ${idx * 0.1}s">
+                <div ${idAttr} class="card ${color} animate-deal ${cursor}" style="margin: 0; animation-delay: ${idx * 0.1}s" ${clickFn}>
                     <div class="absolute top-1 left-1 text-xs">${card.rank}</div>
                     <div class="text-xl">${card.suit}</div>
                     <div class="absolute bottom-1 right-1 text-xs transform rotate-180">${card.rank}</div>
@@ -586,62 +666,131 @@
             const bar = document.getElementById('game-status-bar');
             document.getElementById('pot-display').textContent = "$" + state.pot;
 
-            // --- STATUS & CONTROLS ---
-            if(state.game_type === 'blackjack') {
+            // --- STATUS BAR ---
+            let statusText = "";
+            let statusClass = "bg-black/60 px-6 py-2 rounded-full text-white font-bold mb-2";
+
+            if (state.game_type === 'viuda') {
+                 // VIUDA STATES
+                 if (state.status === 'selection_host') {
+                     if (currentState.isHost) {
+                         statusText = "DECISIÓN: ¿MANO O VIUDA?";
+                         statusClass = "bg-green-600 px-6 py-2 rounded-full text-white font-bold mb-2 animate-pulse";
+                         document.getElementById('viuda-host-opts').classList.remove('hidden-screen');
+                     } else {
+                         statusText = "EL ANFITRION ESTÁ ELIGIENDO...";
+                         document.getElementById('viuda-host-opts').classList.add('hidden-screen');
+                     }
+                     document.getElementById('viuda-buy-opts').classList.add('hidden-screen');
+                     document.getElementById('viuda-play-opts').classList.add('hidden-screen');
+                 } else if (state.status === 'offering_widow') {
+                     if (state.offer_target === currentState.name) {
+                         statusText = "¿COMPRAR VIUDA?";
+                         statusClass = "bg-green-600 px-6 py-2 rounded-full text-white font-bold mb-2 animate-pulse";
+                         document.getElementById('viuda-buy-opts').classList.remove('hidden-screen');
+                     } else {
+                         statusText = `OFRECIENDO VIUDA A ${state.offer_target}`;
+                         document.getElementById('viuda-buy-opts').classList.add('hidden-screen');
+                     }
+                     document.getElementById('viuda-host-opts').classList.add('hidden-screen');
+                     document.getElementById('viuda-play-opts').classList.add('hidden-screen');
+                 } else if (state.status === 'playing' || state.status === 'last_round') {
+                     document.getElementById('viuda-host-opts').classList.add('hidden-screen');
+                     document.getElementById('viuda-buy-opts').classList.add('hidden-screen');
+                     
+                     if (state.status === 'last_round') statusText = "¡ÚLTIMA RONDA!";
+                     else statusText = "JUEGO EN CURSO";
+                     
+                     if (state.turn === currentState.name) {
+                         statusText = (state.status === 'last_round') ? "¡TU ÚLTIMO TURNO!" : "TU TURNO";
+                         statusClass = "bg-green-600 px-6 py-2 rounded-full text-white font-bold mb-2 animate-pulse";
+                         document.getElementById('viuda-play-opts').classList.remove('hidden-screen');
+                         
+                         // Disable Knock if last round
+                         if (state.status === 'last_round') document.getElementById('btn-knock').classList.add('hidden-screen');
+                         else document.getElementById('btn-knock').classList.remove('hidden-screen');
+                     } else {
+                         statusText = `TURNO DE: ${state.turn}`;
+                         document.getElementById('viuda-play-opts').classList.add('hidden-screen');
+                     }
+                 }
+                 
+                 // Render Community/Viuda Cards
+                 const commContainer = document.getElementById('community-cards-container');
+                 let commHtml = "";
+                 
+                 if (state.status === 'selection_host') {
+                     // Show Widow face down
+                     for(let i=0; i<5; i++) commHtml += `<div class="card hidden-card" style="margin:2px"></div>`;
+                 } else if (state.status === 'offering_widow') {
+                     // Still face down
+                     for(let i=0; i<5; i++) commHtml += `<div class="card hidden-card" style="margin:2px"></div>`;
+                 } else {
+                     // Community Cards open
+                     if (state.community_pile) {
+                        state.community_pile.forEach((c, i) => {
+                            // Enable click if my turn
+                            const canClick = (state.turn === currentState.name);
+                            commHtml += renderCommunityCard(c, i, canClick);
+                        });
+                     }
+                 }
+                 commContainer.innerHTML = commHtml;
+                 
+            } else if(state.game_type === 'blackjack') {
                 if(state.turn === currentState.name) {
-                    bar.textContent = "¡TU TURNO!";
-                    bar.className = "bg-green-600 px-6 py-2 rounded-full text-white font-bold mb-2 animate-pulse";
+                    statusText = "¡TU TURNO!";
+                    statusClass = "bg-green-600 px-6 py-2 rounded-full text-white font-bold mb-2 animate-pulse";
                     document.getElementById('btn-hit').disabled = false;
                     document.getElementById('btn-stand').disabled = false;
                 } else {
-                    bar.textContent = `Turno de: ${state.turn || 'Nadie'}`;
-                    bar.className = "bg-black/60 px-6 py-2 rounded-full text-white font-bold mb-2";
+                    statusText = `Turno de: ${state.turn || 'Nadie'}`;
                     document.getElementById('btn-hit').disabled = true;
                     document.getElementById('btn-stand').disabled = true;
                 }
             } else if (state.game_type === 'poker') {
                 if(state.status === 'discard_phase') {
                     if(state.ready_players && state.ready_players.includes(currentState.name)) {
-                        bar.textContent = "ESPERANDO A LOS DEMÁS...";
-                        bar.className = "bg-blue-900 px-6 py-2 rounded-full text-white font-bold mb-2 animate-pulse";
+                        statusText = "ESPERANDO A LOS DEMÁS...";
+                        statusClass = "bg-blue-900 px-6 py-2 rounded-full text-white font-bold mb-2 animate-pulse";
                     } else {
-                        bar.textContent = "ELIGE CARTAS PARA CAMBIAR";
-                        bar.className = "bg-green-600 px-6 py-2 rounded-full text-white font-bold mb-2";
+                        statusText = "ELIGE CARTAS PARA CAMBIAR";
+                        statusClass = "bg-green-600 px-6 py-2 rounded-full text-white font-bold mb-2";
                     }
                 } else {
-                    bar.textContent = "PARTIDA TERMINADA";
-                    bar.className = "bg-yellow-600 px-6 py-2 rounded-full text-black font-bold mb-2";
+                    statusText = "PARTIDA TERMINADA";
+                    statusClass = "bg-yellow-600 px-6 py-2 rounded-full text-black font-bold mb-2";
                 }
             } else if (state.game_type === 'texas') {
                 const myDecided = state.decided_players.includes(currentState.name);
                 const amIActive = state.active_players.includes(currentState.name);
                 
                 if (state.status === 'finished') {
-                    bar.textContent = "PARTIDA TERMINADA";
-                    bar.className = "bg-yellow-600 px-6 py-2 rounded-full text-black font-bold mb-2";
+                    statusText = "PARTIDA TERMINADA";
+                    statusClass = "bg-yellow-600 px-6 py-2 rounded-full text-black font-bold mb-2";
                 } else if (!amIActive) {
-                    bar.textContent = "TE HAS RETIRADO";
-                    bar.className = "bg-red-900/50 px-6 py-2 rounded-full text-red-200 font-bold mb-2";
+                    statusText = "TE HAS RETIRADO";
+                    statusClass = "bg-red-900/50 px-6 py-2 rounded-full text-red-200 font-bold mb-2";
                     document.getElementById('btn-texas-call').disabled = true;
                     document.getElementById('btn-texas-fold').disabled = true;
                     document.getElementById('controls-texas').classList.add('opacity-50');
                 } else if (myDecided) {
-                    bar.textContent = "ESPERANDO RIVALES...";
-                    bar.className = "bg-blue-900 px-6 py-2 rounded-full text-white font-bold mb-2 animate-pulse";
+                    statusText = "ESPERANDO RIVALES...";
+                    statusClass = "bg-blue-900 px-6 py-2 rounded-full text-white font-bold mb-2 animate-pulse";
                     document.getElementById('btn-texas-call').disabled = true;
                     document.getElementById('btn-texas-fold').disabled = true;
                     document.getElementById('btn-texas-call').classList.add('opacity-50');
                     document.getElementById('btn-texas-fold').classList.add('opacity-50');
                 } else {
-                    bar.textContent = "¿VAS O NO VAS?";
-                    bar.className = "bg-green-600 px-6 py-2 rounded-full text-white font-bold mb-2 animate-pulse";
+                    statusText = "¿VAS O NO VAS?";
+                    statusClass = "bg-green-600 px-6 py-2 rounded-full text-white font-bold mb-2 animate-pulse";
                     document.getElementById('btn-texas-call').disabled = false;
                     document.getElementById('btn-texas-fold').disabled = false;
                     document.getElementById('btn-texas-call').classList.remove('opacity-50');
                     document.getElementById('btn-texas-fold').classList.remove('opacity-50');
                 }
                 
-                // Render Community Cards
+                // Render Community Cards Texas
                 const commContainer = document.getElementById('community-cards-container');
                 let commHtml = "";
                 if (state.community_cards) {
@@ -652,12 +801,23 @@
                 commContainer.innerHTML = commHtml;
             }
 
+            bar.textContent = statusText;
+            bar.className = statusClass;
+
             // MY HAND
             const myCards = state.hands[currentState.name] || [];
             let myHandHtml = "";
             myCards.forEach((c, i) => {
-                const clickable = (state.game_type === 'poker' && state.status === 'discard_phase' && !state.ready_players.includes(currentState.name));
-                myHandHtml += renderCard(c, i, false, clickable);
+                let clickable = false;
+                let clickFn = '';
+                if (state.game_type === 'poker' && state.status === 'discard_phase' && !state.ready_players.includes(currentState.name)) {
+                    clickable = true;
+                }
+                if (state.game_type === 'viuda' && (state.status === 'playing' || state.status === 'last_round') && state.turn === currentState.name) {
+                    clickable = true;
+                    clickFn = `selectSwapCard(${i}, 'hand')`;
+                }
+                myHandHtml += renderCard(c, i, false, clickable, clickFn);
             });
             document.getElementById('my-hand').innerHTML = myHandHtml;
 
@@ -676,47 +836,34 @@
                 const oppCards = state.hands[p] || [];
                 let cardsHtml = "";
                 
-                // --- VISIBILIDAD DE CARTAS OPONENTES ---
-                let showAll = false;
-                if (state.status === 'finished') showAll = true;
+                // VISIBILIDAD CARTAS
+                let showAll = (state.status === 'finished');
                 
                 if (state.game_type === 'texas') {
-                    // Si se retiró, a veces no se muestra nada o se ve borroso.
-                    // Si es finished, mostramos si sigue activo.
                     const isActive = state.active_players && state.active_players.includes(p);
                     if (!isActive && state.status !== 'finished') {
-                        // Jugador retirado durante el juego
                         cardsHtml = `<div class="text-xs text-red-400 font-bold mt-4">SE RETIRÓ</div>`;
                     } else {
-                        // Activo
-                        if (showAll) {
-                            oppCards.forEach((c, i) => cardsHtml += renderCard(c, i));
-                        } else {
-                            oppCards.forEach((c, i) => cardsHtml += renderCard(null, i, true));
-                        }
-                    }
-                } else if(state.game_type === 'poker') {
-                    if(showAll) {
-                        oppCards.forEach((c, i) => cardsHtml += renderCard(c, i));
-                    } else {
-                        oppCards.forEach((c, i) => cardsHtml += renderCard(null, i, true));
+                        if (showAll) oppCards.forEach((c, i) => cardsHtml += renderCard(c, i));
+                        else oppCards.forEach((c, i) => cardsHtml += renderCard(null, i, true));
                     }
                 } else {
-                    // Blackjack
-                    if(showAll) {
-                        oppCards.forEach((c, i) => cardsHtml += renderCard(c, i));
-                    } else {
-                        if(oppCards.length > 0) {
-                            cardsHtml += renderCard(oppCards[0], 0);
-                            for(let i=1; i<oppCards.length; i++) cardsHtml += renderCard(null, i, true);
-                        }
-                    }
+                     if (showAll) oppCards.forEach((c, i) => cardsHtml += renderCard(c, i));
+                     else {
+                         // Default hidden
+                         if(state.game_type === 'blackjack' && oppCards.length > 0) {
+                              cardsHtml += renderCard(oppCards[0], 0); // 1 visible blackjack
+                              for(let i=1; i<oppCards.length; i++) cardsHtml += renderCard(null, i, true);
+                         } else {
+                              oppCards.forEach((c, i) => cardsHtml += renderCard(null, i, true));
+                         }
+                     }
                 }
 
                 // SUBTITLE
                 let subtitle = "";
                 if(state.status === 'finished') {
-                     if(state.game_type === 'poker' || state.game_type === 'texas') {
+                     if(['poker', 'texas', 'viuda'].includes(state.game_type)) {
                         let shortName = state.hand_names[p] || '';
                         if (!shortName && state.game_type === 'texas' && !state.active_players.includes(p)) shortName = "Retirado";
                         if(shortName.length > 15) shortName = shortName.substring(0, 15) + "...";
@@ -725,16 +872,16 @@
                         subtitle = `<span class="text-xs font-mono bg-black/50 px-2 rounded text-yellow-500">${state.scores[p]}</span>`;
                     }
                 } else {
-                     if(state.game_type === 'poker' && state.ready_players && state.ready_players.includes(p)) {
-                         subtitle = `<span class="text-[10px] text-green-400 font-bold"><i class="fa-solid fa-check"></i> LISTO</span>`;
-                     } else if (state.game_type === 'texas') {
+                     // Estados intermedios
+                     if (state.game_type === 'texas') {
                          if (state.decided_players.includes(p)) {
                               const decision = (state.active_players.includes(p)) ? "VOY" : "NO VOY";
                               const color = (decision === "VOY") ? "text-green-400" : "text-red-400";
                               subtitle = `<span class="text-[10px] ${color} font-bold">${decision}</span>`;
-                         } else {
-                              subtitle = `<span class="text-[10px] text-slate-500 italic">Pensando...</span>`;
-                         }
+                         } else subtitle = `<span class="text-[10px] text-slate-500 italic">Pensando...</span>`;
+                     } else if (state.game_type === 'viuda') {
+                         if (state.knocker === p) subtitle = `<span class="text-xs text-red-500 font-bold animate-pulse">¡TOCÓ!</span>`;
+                         else subtitle = `<span class="text-[10px] text-slate-500 italic">Jugando...</span>`;
                      } else {
                          subtitle = `<span class="text-[10px] text-slate-500 italic">Pensando...</span>`;
                      }
@@ -773,8 +920,8 @@
 
             html += `<p class="text-sm text-slate-400 italic">${state.win_reason}</p>`;
             
-            if((state.game_type === 'poker' || state.game_type === 'texas') && state.hand_names) {
-                const myHandName = state.hand_names[currentState.name] || (state.active_players && !state.active_players.includes(currentState.name) ? "Te Retiraste" : "");
+            if(['poker', 'texas', 'viuda'].includes(state.game_type) && state.hand_names) {
+                const myHandName = state.hand_names[currentState.name] || (state.game_type==='texas' && state.active_players && !state.active_players.includes(currentState.name) ? "Te Retiraste" : "");
                 if (myHandName) {
                     html += `<div class="mt-4 bg-slate-800 p-3 rounded text-sm text-slate-300 border border-slate-600">
                         <p class="text-xs text-slate-500 uppercase font-bold mb-1">Tu Jugada</p>
@@ -782,7 +929,6 @@
                     </div>`;
                 }
             }
-
             content.innerHTML = html;
         }
     </script>
