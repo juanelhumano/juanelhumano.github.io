@@ -65,10 +65,10 @@
         #chat-messages::-webkit-scrollbar-thumb { background: #ca8a04; border-radius: 3px; }
     </style>
 </head>
-<body class="bg-slate-950 min-h-screen flex flex-col overflow-hidden">
+<body class="bg-slate-950 min-h-screen flex flex-col overflow-y-auto">
 
     <!-- Navbar -->
-    <nav class="w-full bg-slate-900 border-b border-yellow-600/30 p-4 flex justify-between items-center z-50">
+    <nav class="w-full bg-slate-900 border-b border-yellow-600/30 p-4 flex justify-between items-center z-50 sticky top-0">
         <div class="flex items-center gap-3 cursor-pointer" onclick="location.reload()">
             <i class="fa-solid fa-crown text-yellow-500 text-2xl"></i>
             <span class="text-xl font-bold brand-font gold-text">CASINO PERRÓN</span>
@@ -79,10 +79,10 @@
     </nav>
 
     <!-- Main Content -->
-    <main class="flex-grow container mx-auto p-4 flex flex-col justify-center items-center relative">
+    <main class="flex-grow container mx-auto p-4 flex flex-col items-center relative">
         
         <!-- SCREEN 1: LANDING -->
-        <div id="screen-landing" class="w-full max-w-md text-center space-y-6">
+        <div id="screen-landing" class="w-full max-w-md text-center space-y-6 mt-10">
             <div class="mb-4">
                 <i class="fa-solid fa-dice text-6xl text-yellow-600 mb-4 block"></i>
                 <h1 class="text-4xl md:text-5xl font-bold text-white mb-2 brand-font">Bienvenido</h1>
@@ -99,7 +99,7 @@
         </div>
 
         <!-- SCREEN 2: GAME SELECTION -->
-        <div id="screen-selection" class="hidden-screen w-full max-w-6xl text-center">
+        <div id="screen-selection" class="hidden-screen w-full max-w-6xl text-center mt-6 mb-12">
             <h2 class="text-3xl gold-text mb-8 brand-font">Selecciona tu Mesa</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 
@@ -139,7 +139,7 @@
         </div>
 
         <!-- SCREEN 3: LOBBY -->
-        <div id="screen-lobby" class="hidden-screen w-full max-w-md text-center">
+        <div id="screen-lobby" class="hidden-screen w-full max-w-md text-center mt-6">
             <h2 id="lobby-title" class="text-3xl text-yellow-500 mb-2 brand-font">Sala</h2>
             
             <div id="lobby-controls" class="space-y-4">
@@ -187,7 +187,7 @@
                 <button onclick="showScreen('screen-selection')" class="text-slate-500 hover:text-white underline text-sm">Cambiar Juego</button>
             </div>
 
-            <div id="lobby-waiting" class="hidden-screen mt-4">
+            <div id="lobby-waiting" class="hidden-screen mt-4 pb-10">
                 <p class="text-xl text-white mb-2">Código: <span id="display-code" class="font-mono bg-slate-800 px-3 py-1 rounded border border-yellow-500/50 text-yellow-400">----</span></p>
                 <p id="game-mode-display" class="text-xs text-yellow-500 mb-4 font-bold uppercase"></p>
 
@@ -203,7 +203,7 @@
         </div>
 
         <!-- SCREEN 4: GAME TABLE -->
-        <div id="screen-game" class="hidden-screen w-full h-full flex flex-col items-center justify-center pt-4">
+        <div id="screen-game" class="hidden-screen w-full min-h-full flex flex-col items-center justify-start pt-4 pb-24">
             
             <div class="w-full max-w-5xl flex justify-between items-start px-2 mb-2">
                 <div class="bg-slate-900/80 px-4 py-1 rounded-full border border-yellow-600/30">
@@ -223,8 +223,7 @@
                 </div>
             </div>
 
-            <!-- LAYOUT FIX: Added flex-col and justify-between to ensure spacing -->
-            <div class="poker-table w-full max-w-5xl flex-grow relative m-2 rounded-[60px] flex flex-col justify-between p-4">
+            <div class="poker-table w-full max-w-5xl flex-grow relative m-2 rounded-[60px] flex flex-col justify-between p-4 min-h-[500px]">
                 
                 <!-- TOP: Opponents Area -->
                 <div id="opponents-area" class="flex justify-center gap-4 flex-wrap z-10 min-h-[100px]"></div>
@@ -232,8 +231,7 @@
                 <!-- MIDDLE: Community Cards & Logo -->
                 <div class="flex flex-col items-center justify-center my-4 z-0">
                     <div id="center-logo" class="opacity-10 text-4xl md:text-6xl text-black brand-font text-center leading-tight mb-2">CASINO<br>PERRÓN</div>
-                    <!-- Community Cards Container -->
-                    <div id="community-cards-container" class="flex gap-2 min-h-[90px] pointer-events-auto"></div>
+                    <div id="community-cards-container" class="flex gap-2 min-h-[90px] pointer-events-auto flex-wrap justify-center"></div>
                 </div>
 
                 <!-- BOTTOM: My Player Area -->
@@ -248,7 +246,7 @@
                     </div>
 
                     <div class="relative">
-                        <div id="my-hand" class="flex justify-center" style="min-height: 90px;"></div>
+                        <div id="my-hand" class="flex justify-center flex-wrap" style="min-height: 90px;"></div>
                     </div>
 
                     <div class="bg-slate-900 px-4 py-1 rounded-xl border-t-2 border-yellow-600 mt-2 shadow-xl flex items-center gap-4">
@@ -265,18 +263,18 @@
             </div>
 
             <!-- CONTROLS -->
-            <div id="controls-blackjack" class="w-full max-w-md grid grid-cols-2 gap-4 p-4 hidden-screen">
+            <div id="controls-blackjack" class="w-full max-w-md grid grid-cols-2 gap-4 p-4 hidden-screen mt-auto">
                 <button onclick="sendAction('hit')" id="btn-hit" class="bg-green-700 text-white py-3 rounded-lg font-bold shadow-lg border-b-4 border-green-900 active:translate-y-1">PEDIR (+1)</button>
                 <button onclick="sendAction('stand')" id="btn-stand" class="bg-red-700 text-white py-3 rounded-lg font-bold shadow-lg border-b-4 border-red-900 active:translate-y-1">PLANTARSE</button>
             </div>
 
-            <div id="controls-poker" class="w-full max-w-md p-4 hidden-screen">
+            <div id="controls-poker" class="w-full max-w-md p-4 hidden-screen mt-auto">
                 <button onclick="sendPokerExchange()" id="btn-exchange" class="w-full bg-blue-700 hover:bg-blue-600 text-white py-3 rounded-lg font-bold shadow-lg border-b-4 border-blue-900 active:translate-y-1">
                     CONFIRMAR CAMBIO
                 </button>
             </div>
 
-            <div id="controls-texas" class="w-full max-w-md grid grid-cols-2 gap-4 p-4 hidden-screen">
+            <div id="controls-texas" class="w-full max-w-md grid grid-cols-2 gap-4 p-4 hidden-screen mt-auto">
                 <button onclick="sendAction('call')" id="btn-texas-call" class="bg-green-600 hover:bg-green-500 text-white py-3 rounded-lg font-bold shadow-lg border-b-4 border-green-800 active:translate-y-1 text-sm md:text-base flex flex-col items-center leading-none gap-1">
                     <span>¡VOY!</span><span class="text-[10px] opacity-80">(Igualar Apuesta)</span>
                 </button>
@@ -286,7 +284,7 @@
             </div>
 
             <!-- VIUDA CONTROLS -->
-            <div id="controls-viuda" class="w-full max-w-md p-4 hidden-screen space-y-2">
+            <div id="controls-viuda" class="w-full max-w-md p-4 hidden-screen space-y-2 mt-auto">
                 <!-- Host Selection -->
                 <div id="viuda-host-opts" class="hidden-screen grid grid-cols-2 gap-4">
                     <button onclick="sendAction('keep_hand')" class="bg-slate-600 hover:bg-slate-500 text-white py-3 rounded-lg font-bold shadow-lg">ME QUEDO MI MANO</button>
@@ -302,6 +300,8 @@
                      <button onclick="sendViudaSwap1()" id="btn-swap-1" class="bg-blue-600 text-white py-3 rounded-lg font-bold text-xs disabled:opacity-50">CAMBIAR 1</button>
                      <button onclick="sendAction('swap_all')" id="btn-swap-all" class="bg-purple-600 text-white py-3 rounded-lg font-bold text-xs">CAMBIAR 5</button>
                      <button onclick="sendAction('knock')" id="btn-knock" class="bg-yellow-600 text-white py-3 rounded-lg font-bold text-xs">TOCAR</button>
+                     <!-- NUEVO BOTÓN PARA PASAR/PLANTARSE -->
+                     <button onclick="sendAction('pass')" id="btn-pass" class="bg-slate-500 text-white py-3 rounded-lg font-bold text-xs hidden-screen">ME PLANTO</button>
                 </div>
             </div>
         </div>
@@ -713,9 +713,15 @@
                          statusClass = "bg-green-600 px-6 py-2 rounded-full text-white font-bold mb-2 animate-pulse";
                          document.getElementById('viuda-play-opts').classList.remove('hidden-screen');
                          
-                         // Disable Knock if last round
-                         if (state.status === 'last_round') document.getElementById('btn-knock').classList.add('hidden-screen');
-                         else document.getElementById('btn-knock').classList.remove('hidden-screen');
+                         // LOGICA DEL BOTON ME PLANTO
+                         if (state.status === 'last_round') {
+                             document.getElementById('btn-knock').classList.add('hidden-screen');
+                             document.getElementById('btn-pass').classList.remove('hidden-screen');
+                         } else {
+                             document.getElementById('btn-knock').classList.remove('hidden-screen');
+                             document.getElementById('btn-pass').classList.add('hidden-screen');
+                         }
+
                      } else {
                          statusText = `TURNO DE: ${state.turn}`;
                          document.getElementById('viuda-play-opts').classList.add('hidden-screen');
