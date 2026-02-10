@@ -99,7 +99,7 @@
             <button onclick="joinGame()" class="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 rounded-lg transition transform hover:scale-105 shadow-lg">
                 ENTRAR A LA CARRERA
             </button>
-            <p id="connectionStatus" class="mt-4 text-xs text-red-400 hidden">Modo Offline (Solo Práctica)</p>
+            <p id="connectionStatus" class="mt-4 text-xs text-red-400 hidden">Error de conexión: Usando Modo Offline</p>
         </div>
     </div>
 
@@ -211,19 +211,21 @@
         // --- LÓGICA DE CONEXIÓN ---
         
         function initSocket() {
-            // Intenta conectar al mismo origen (asume que app.py sirve este html)
+            // Intenta conectar al servidor Render especificado
             try {
-                socket = io();
+                // Aquí establecemos la conexión directa a tu URL
+                socket = io('https://horsederby.onrender.com');
                 
                 socket.on('connect', () => {
-                    console.log("Conectado al servidor");
+                    console.log("Conectado al servidor Render");
                     myId = socket.id;
                     isOfflineMode = false;
+                    document.getElementById('connectionStatus').classList.add('hidden');
                 });
 
                 socket.on('connect_error', () => {
-                    // Fallback para preview/sin servidor
-                    console.log("Error de conexión. Activando modo offline.");
+                    // Si falla la conexión a Render, usamos el modo offline local
+                    console.log("Error de conexión con Render. Activando modo offline local.");
                     document.getElementById('connectionStatus').classList.remove('hidden');
                     isOfflineMode = true;
                 });
@@ -236,12 +238,13 @@
                 socket.on('error', (data) => alert(data.msg));
                 
             } catch (e) {
+                console.error("Error al inicializar socket:", e);
                 isOfflineMode = true;
                 document.getElementById('connectionStatus').classList.remove('hidden');
             }
         }
 
-        // Inicializar socket al cargar (aunque fallará en preview, es necesario para la estructura)
+        // Inicializar socket al cargar
         initSocket();
 
         function joinGame() {
@@ -254,7 +257,7 @@
             }
 
             if (isOfflineMode) {
-                // Simulación para modo offline (Preview)
+                // Simulación para modo offline (Preview o fallo de conexión)
                 mockJoin(username, room);
             } else {
                 socket.emit('join_game', { username, room });
