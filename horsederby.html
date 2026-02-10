@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gran Carrera de Feria</title>
+    <!-- Tailwind CSS para diseño rápido -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Socket.IO Cliente -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <!-- Íconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        body {
+            background-color: #2c3e50;
+            background-image: radial-gradient(#34495e 15%, transparent 16%),
+            radial-gradient(#34495e 15%, transparent 16%);
+            background-size: 60px 60px;
+            background-position: 0 0, 30px 30px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            overflow-x: hidden;
+        }
+        
+        /* Animación de la barra de potencia */
+        @keyframes moveCursor {
+            0% { left: 0%; }
+            50% { left: 95%; }
+            100% { left: 0%; }
+        }
+        
+        .power-cursor {
+            position: absolute;
+            top: -5px;
+            bottom: -5px;
+            width: 10px;
+            background: white;
+            border: 2px solid black;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            border-radius: 5px;
+            /* La animación se controla con JS para poder pararla */
+        }
+
+        .track-lane {
+            border-bottom: 1px dashed rgba(255,255,255,0.2);
+            position: relative;
+            height: 50px;
+            transition: all 0.3s ease;
+        }
+
+        .horse {
+            transition: left 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+            position: absolute;
+            top: 5px;
+            font-size: 2rem;
+            filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.5));
+            z-index: 10;
+        }
+
+        .finish-line {
+            position: absolute;
+            right: 20px;
+            top: 0;
+            bottom: 0;
+            width: 10px;
+            background-image: linear-gradient(45deg, #000 25%, transparent 25%), 
+                              linear-gradient(-45deg, #000 25%, transparent 25%), 
+                              linear-gradient(45deg, transparent 75%, #000 75%), 
+                              linear-gradient(-45deg, transparent 75%, #000 75%);
+            background-size: 20px 20px;
+            background-color: white;
+            z-index: 5;
+        }
+        
+        .modal {
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(5px);
+        }
+
+        .target-zone {
+            height: 100%;
+            position: absolute;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- PANTALLA DE INICIO -->
+    <div id="loginScreen" class="flex-1 flex flex-col items-center justify-center p-4">
+        <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl max-w-md w-full border border-gray-700 text-center">
+            <h1 class="text-4xl font-bold mb-2 text-yellow-400"><i class="fas fa-horse-head"></i> Derby de Feria</h1>
+            <p class="text-gray-400 mb-6">¡Acierta al blanco para correr!</p>
+            
+            <input type="text" id="username" placeholder="Tu Apodo (Alias)" class="w-full p-3 mb-4 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-yellow-400 text-white font-bold">
+            <input type="text" id="roomCode" placeholder="Código de Sala (ej: SALA1)" class="w-full p-3 mb-6 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-yellow-400 text-white font-bold uppercase">
+            
+            <button onclick="joinGame()" class="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 rounded-lg transition transform hover:scale-105 shadow-lg">
+                ENTRAR A LA CARRERA
+            </button>
+            <p id="connectionStatus" class="mt-4 text-xs text-red-400 hidden">Modo Offline (Solo Práctica)</p>
+        </div>
+    </div>
+
+    <!-- PANTALLA DE ESPERA (LOBBY) -->
+    <div id="lobbyScreen" class="hidden flex-1 flex flex-col items-center justify-center p-4">
+        <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl max-w-2xl w-full border border-gray-700">
+            <h2 class="text-3xl font-bold mb-4 text-center">Sala de Espera: <span id="lobbyRoomName" class="text-yellow-400"></span></h2>
+            
+            <div class="bg-gray-900 rounded-lg p-4 mb-6 min-h-[200px]">
+                <h3 class="text-sm uppercase tracking-wide text-gray-500 mb-2">Corredores listos:</h3>
+                <ul id="playerList" class="space-y-2">
+                    <!-- Jugadores se insertan aquí -->
+                </ul>
+            </div>
+
+            <div id="hostControls" class="hidden text-center">
+                <p class="mb-2 text-green-400">Eres el anfitrión (Host)</p>
+                <button onclick="startGame()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg text-xl animate-pulse">
+                    ¡COMENZAR CARRERA!
+                </button>
+            </div>
+            <div id="waitingMsg" class="text-center text-gray-400 italic">
+                Esperando al anfitrión para iniciar...
+            </div>
+        </div>
+    </div>
+
+    <!-- PANTALLA DE JUEGO -->
+    <div id="gameScreen" class="hidden flex-1 flex flex-col overflow-hidden">
+        
+        <!-- Pista de Carreras -->
+        <div class="flex-1 bg-green-800 relative overflow-y-auto p-4 shadow-inner" id="trackContainer">
+            <div class="finish-line"></div>
+            <!-- Los carriles se generan dinámicamente -->
+            <div id="lanesContainer" class="mt-4"></div>
+        </div>
+
+        <!-- Panel de Control (Lanzamiento) -->
+        <div class="h-64 bg-gray-900 border-t-4 border-yellow-600 p-4 flex flex-col items-center justify-center relative shadow-2xl z-20">
+            
+            <!-- Cuenta regresiva (Overlay) -->
+            <div id="countdownOverlay" class="absolute inset-0 bg-black bg-opacity-80 flex items-center justify-center z-30 hidden">
+                <span id="countdownText" class="text-9xl font-bold text-white drop-shadow-lg">3</span>
+            </div>
+
+            <div class="w-full max-w-3xl mb-2 flex justify-between items-end">
+                <div class="text-center">
+                    <p class="text-gray-400 text-sm">Tu Puntuación</p>
+                    <p id="myScoreDisplay" class="text-3xl font-bold text-yellow-400">0</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-gray-400 text-sm">Último Tiro</p>
+                    <div id="feedbackText" class="h-8 text-xl font-bold text-white">¡Listo!</div>
+                </div>
+            </div>
+
+            <!-- Mecánica de Tiro: Barra de Potencia -->
+            <div class="relative w-full max-w-3xl h-16 bg-gray-700 rounded-full border-4 border-gray-600 overflow-hidden mb-4 cursor-pointer select-none" id="powerBarContainer">
+                <!-- Zonas de puntuación -->
+                <div class="target-zone bg-red-500 left-0 w-[30%]"></div>
+                <div class="target-zone bg-yellow-500 left-[30%] w-[15%]"></div>
+                <div class="target-zone bg-green-500 left-[45%] w-[10%]"></div> <!-- Centro Perfecto (50) -->
+                <div class="target-zone bg-yellow-500 left-[55%] w-[15%]"></div>
+                <div class="target-zone bg-red-500 left-[70%] w-[30%]"></div>
+
+                <!-- Cursor que se mueve -->
+                <div id="powerCursor" class="power-cursor left-0"></div>
+                
+                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span class="font-bold text-black opacity-50 uppercase tracking-widest">Lanzar al Centro</span>
+                </div>
+            </div>
+
+            <button id="throwBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-12 rounded-full shadow-lg border-b-4 border-red-800 active:border-red-600 active:translate-y-1 text-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                ¡LANZAR! (ESPACIO)
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal de Ganador -->
+    <div id="winnerModal" class="fixed inset-0 modal hidden flex items-center justify-center z-50">
+        <div class="bg-white text-black p-10 rounded-3xl text-center shadow-2xl max-w-lg transform scale-110">
+            <i class="fas fa-trophy text-6xl text-yellow-500 mb-4 animate-bounce"></i>
+            <h2 class="text-4xl font-bold mb-2">¡TENEMOS UN GANADOR!</h2>
+            <p class="text-2xl text-gray-700 mb-6">Ganador: <span id="winnerName" class="font-bold text-blue-600">Nombre</span></p>
+            <button onclick="location.reload()" class="bg-blue-600 text-white py-3 px-8 rounded-full font-bold hover:bg-blue-700">Jugar de nuevo</button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURACIÓN ---
+        let socket;
+        let isHost = false;
+        let myId = null;
+        let isOfflineMode = false;
+        let gameActive = false;
+        let animationId;
+        
+        // Elementos DOM
+        const screens = {
+            login: document.getElementById('loginScreen'),
+            lobby: document.getElementById('lobbyScreen'),
+            game: document.getElementById('gameScreen')
+        };
+        const throwBtn = document.getElementById('throwBtn');
+        const powerCursor = document.getElementById('powerCursor');
+        const feedbackText = document.getElementById('feedbackText');
+        
+        // --- LÓGICA DE CONEXIÓN ---
+        
+        function initSocket() {
+            // Intenta conectar al mismo origen (asume que app.py sirve este html)
+            try {
+                socket = io();
+                
+                socket.on('connect', () => {
+                    console.log("Conectado al servidor");
+                    myId = socket.id;
+                    isOfflineMode = false;
+                });
+
+                socket.on('connect_error', () => {
+                    // Fallback para preview/sin servidor
+                    console.log("Error de conexión. Activando modo offline.");
+                    document.getElementById('connectionStatus').classList.remove('hidden');
+                    isOfflineMode = true;
+                });
+
+                // Eventos del Juego
+                socket.on('room_update', updateLobby);
+                socket.on('game_started', setupGameUI);
+                socket.on('update_positions', updateRace);
+                socket.on('player_won', showWinner);
+                socket.on('error', (data) => alert(data.msg));
+                
+            } catch (e) {
+                isOfflineMode = true;
+                document.getElementById('connectionStatus').classList.remove('hidden');
+            }
+        }
+
+        // Inicializar socket al cargar (aunque fallará en preview, es necesario para la estructura)
+        initSocket();
+
+        function joinGame() {
+            const username = document.getElementById('username').value.trim();
+            const room = document.getElementById('roomCode').value.trim().toUpperCase();
+
+            if (!username || !room) {
+                alert("Por favor ingresa nombre y sala");
+                return;
+            }
+
+            if (isOfflineMode) {
+                // Simulación para modo offline (Preview)
+                mockJoin(username, room);
+            } else {
+                socket.emit('join_game', { username, room });
+                showScreen('lobby');
+                document.getElementById('lobbyRoomName').innerText = room;
+            }
+        }
+
+        function showScreen(screenName) {
+            Object.values(screens).forEach(s => s.classList.add('hidden'));
+            screens[screenName].classList.remove('hidden');
+        }
+
+        // --- LÓGICA DEL LOBBY ---
+
+        function updateLobby(data) {
+            const list = document.getElementById('playerList');
+            list.innerHTML = '';
+            
+            // Verificar si soy host
+            const me = data.players.find(p => p.id === socket.id);
+            if (me && me.is_host) {
+                document.getElementById('hostControls').classList.remove('hidden');
+                document.getElementById('waitingMsg').classList.add('hidden');
+            }
+
+            data.players.forEach(p => {
+                const li = document.createElement('li');
+                li.className = "flex items-center justify-between bg-gray-800 p-3 rounded border border-gray-700";
+                li.innerHTML = `
+                    <span class="font-bold flex items-center">
+                        <i class="fas fa-horse mr-2" style="color: ${p.color}"></i> ${p.name}
+                    </span>
+                    <span class="text-xs text-gray-500">${p.is_host ? '<i class="fas fa-crown text-yellow-500"></i> HOST' : ''}</span>
+                `;
+                list.appendChild(li);
+            });
+        }
+
+        // --- LÓGICA DEL JUEGO ---
+
+        function startGame() {
+            if (isOfflineMode) {
+                setupGameUI(); // Simulación directa
+            } else {
+                socket.emit('start_game', { room: document.getElementById('roomCode').value.toUpperCase() });
+            }
+        }
+
+        function setupGameUI() {
+            showScreen('game');
+            generateTrack(); // Crear carriles visuales
+            
+            // Iniciar cuenta regresiva
+            const overlay = document.getElementById('countdownOverlay');
+            const text = document.getElementById('countdownText');
+            overlay.classList.remove('hidden');
+            
+            let count = 3;
+            text.innerText = count;
+            
+            const timer = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    text.innerText = count;
+                } else if (count === 0) {
+                    text.innerText = "¡YA!";
+                    text.classList.add('text-green-500');
+                } else {
+                    clearInterval(timer);
+                    overlay.classList.add('hidden');
+                    gameActive = true;
+                    startBarAnimation(); // Iniciar la barra oscilante
+                }
+            }, 1000);
+        }
+
+        // Generar carriles basados en los jugadores (o mock)
+        function generateTrack() {
+            const container = document.getElementById('lanesContainer');
+            container.innerHTML = '';
+            
+            // Si estamos offline, creamos jugadores falsos
+            let players = [];
+            if (isOfflineMode) {
+                const myName = document.getElementById('username').value;
+                players = [
+                    { id: 'me', name: myName, color: '#33FF57', score: 0 },
+                    { id: 'cpu1', name: 'CPU Rápido', color: '#FF5733', score: 0 },
+                    { id: 'cpu2', name: 'CPU Lento', color: '#3357FF', score: 0 }
+                ];
+                myId = 'me';
+                
+                // Simular movimiento de CPU
+                simulateCPU();
+            } else {
+                // Aquí deberíamos tener la lista actual, pero la obtendremos del update
+                // Inicialmente creamos carriles vacíos hasta que llegue el primer update_positions
+            }
+
+            // Render inicial (se actualizará con sockets)
+            renderLanes(players);
+        }
+
+        function renderLanes(players) {
+            const container = document.getElementById('lanesContainer');
+            // Solo reconstruir si cambia el número de jugadores para evitar parpadeo
+            if (container.children.length !== players.length) {
+                container.innerHTML = '';
+                players.forEach(p => {
+                    const lane = document.createElement('div');
+                    lane.className = "track-lane w-full flex items-center";
+                    lane.id = `lane-${p.id}`;
+                    
+                    // Caballo
+                    const horse = document.createElement('div');
+                    horse.className = "horse";
+                    horse.innerHTML = `<i class="fas fa-horse-head"></i> <span class="text-xs font-bold bg-black px-1 rounded opacity-75 text-white">${p.name}</span>`;
+                    horse.style.color = p.color;
+                    horse.style.left = '0%';
+                    horse.id = `horse-${p.id}`;
+                    
+                    lane.appendChild(horse);
+                    container.appendChild(lane);
+                });
+            }
+        }
+
+        function updateRace(playersMap) {
+            // Convertir mapa a array si viene del servidor
+            const players = Object.values(playersMap); // El servidor manda un dict
+            
+            // Asegurarnos que los carriles existen
+            const container = document.getElementById('lanesContainer');
+            if (container.children.length === 0) {
+                // Convertir el objeto de jugadores a array formato frontend
+                const playersArray = Object.keys(playersMap).map(key => {
+                    return { id: key, ...playersMap[key] };
+                });
+                renderLanes(playersArray);
+            }
+
+            // Mover caballos
+            for (const [pid, pData] of Object.entries(playersMap)) {
+                const horseEl = document.getElementById(`horse-${pid}`);
+                if (horseEl) {
+                    // Calcular porcentaje (0 a 1000 puntos)
+                    const percent = Math.min((pData.score / 1000) * 90, 90); // Máximo 90% para no salirse
+                    horseEl.style.left = `${percent}%`;
+                    
+                    if (pid === socket.id) {
+                        document.getElementById('myScoreDisplay').innerText = pData.score;
+                    }
+                }
+            }
+        }
+
+        // --- LÓGICA DE LA BARRA DE POTENCIA (SKILL CHECK) ---
+        
+        let cursorDirection = 1; // 1 derecha, -1 izquierda
+        let cursorPos = 0;
+        let speed = 2.5; // Velocidad de oscilación
+
+        function startBarAnimation() {
+            function animate() {
+                if (!gameActive) return;
+                
+                cursorPos += speed * cursorDirection;
+                
+                if (cursorPos >= 100) {
+                    cursorPos = 100;
+                    cursorDirection = -1;
+                } else if (cursorPos <= 0) {
+                    cursorPos = 0;
+                    cursorDirection = 1;
+                }
+                
+                powerCursor.style.left = `${cursorPos}%`;
+                animationId = requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
+        // Evento de Lanzar
+        function handleThrow() {
+            if (!gameActive) return;
+
+            // Calcular puntuación basada en posición
+            // Centro es 50% (aprox). 
+            // Rangos: 45-55 (50pts), 30-70 (20pts), 0-100 (10pts)
+            
+            let points = 0;
+            let msg = "";
+            let color = "";
+
+            if (cursorPos >= 45 && cursorPos <= 55) {
+                points = 50;
+                msg = "¡PERFECTO! +50";
+                color = "text-green-400";
+            } else if (cursorPos >= 30 && cursorPos <= 70) {
+                points = 20;
+                msg = "¡BIEN! +20";
+                color = "text-yellow-400";
+            } else {
+                points = 10;
+                msg = "Rozando... +10";
+                color = "text-gray-400";
+            }
+
+            // Feedback visual
+            feedbackText.innerText = msg;
+            feedbackText.className = `text-2xl font-bold ${color} animate-ping`;
+            setTimeout(() => feedbackText.classList.remove('animate-ping'), 500);
+
+            // Enviar al servidor
+            if (isOfflineMode) {
+                mockUpdateSelf(points);
+            } else {
+                socket.emit('throw_ball', { room: document.getElementById('roomCode').value.toUpperCase(), power: points });
+            }
+        }
+
+        // Listeners
+        throwBtn.addEventListener('click', handleThrow);
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && gameActive) {
+                handleThrow();
+            }
+        });
+
+        function showWinner(data) {
+            gameActive = false;
+            cancelAnimationFrame(animationId);
+            document.getElementById('winnerName').innerText = data.name;
+            document.getElementById('winnerModal').classList.remove('hidden');
+        }
+
+        // --- SIMULACIÓN OFFLINE (PARA PREVIEW) ---
+        
+        let mockPlayers = {};
+        
+        function mockJoin(username, room) {
+            showScreen('lobby');
+            document.getElementById('lobbyRoomName').innerText = "OFFLINE DEMO";
+            document.getElementById('hostControls').classList.remove('hidden');
+            document.getElementById('waitingMsg').classList.add('hidden');
+            
+            const list = document.getElementById('playerList');
+            list.innerHTML = `
+                <li class="bg-gray-800 p-2 text-white">🐴 ${username} (Tú) - HOST</li>
+                <li class="bg-gray-800 p-2 text-gray-400">🤖 CPU Rápido</li>
+                <li class="bg-gray-800 p-2 text-gray-400">🤖 CPU Lento</li>
+            `;
+        }
+
+        function mockUpdateSelf(points) {
+            const myHorse = document.getElementById('horse-me');
+            let currentLeft = parseFloat(myHorse.style.left) || 0;
+            // Convertir % a puntos aprox para la demo
+            let currentScore = (currentLeft / 90) * 1000;
+            currentScore += points;
+            
+            let newPercent = Math.min((currentScore / 1000) * 90, 90);
+            myHorse.style.left = `${newPercent}%`;
+            document.getElementById('myScoreDisplay').innerText = Math.floor(currentScore);
+
+            if (currentScore >= 1000) {
+                showWinner({name: 'TÚ'});
+            }
+        }
+
+        function simulateCPU() {
+            if (!gameActive) {
+                setTimeout(simulateCPU, 1000);
+                return;
+            }
+            
+            ['cpu1', 'cpu2'].forEach(id => {
+                const horse = document.getElementById(`horse-${id}`);
+                if(horse) {
+                    let currentLeft = parseFloat(horse.style.left) || 0;
+                    // Velocidad aleatoria
+                    let speed = id === 'cpu1' ? Math.random() * 2 : Math.random() * 1.5; 
+                    let newLeft = Math.min(currentLeft + speed, 90);
+                    horse.style.left = `${newLeft}%`;
+
+                    if (newLeft >= 90 && gameActive) {
+                        showWinner({name: id === 'cpu1' ? 'CPU Rápido' : 'CPU Lento'});
+                    }
+                }
+            });
+            
+            if (gameActive) setTimeout(simulateCPU, 200);
+        }
+
+    </script>
+</body>
+</html>
