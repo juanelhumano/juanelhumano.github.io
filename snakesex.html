@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Snake Royale: Metal & Apples</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1e272e; color: white; text-align: center; margin: 0; padding: 20px; overflow-x: hidden;}
+        #game-container { display: none; position: relative; width: max-content; margin: 0 auto; }
+        canvas { background: #1a1e22; border: 4px solid #718093; box-shadow: 0 0 20px rgba(0,0,0,0.8); border-radius: 8px; }
+        .panel { background: #2f3640; padding: 30px; border-radius: 12px; display: inline-block; margin-top: 50px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        input { padding: 12px; margin: 10px; font-size: 16px; border-radius: 6px; border: none; outline: none; text-align: center; background: #dfe6e9;}
+        button { cursor: pointer; background: #e84118; color: white; border: none; border-radius: 6px; padding: 12px 20px; font-size: 16px; font-weight: bold; transition: 0.2s; }
+        button:hover { background: #c23616; transform: scale(1.05); }
+        .btn-green { background: #4cd137; }
+        .btn-green:hover { background: #44bd32; }
+        #game-over-modal { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(47, 54, 64, 0.98); padding: 40px; border-radius: 12px; border: 2px solid #fbc531; box-shadow: 0 0 30px rgba(0,0,0,0.8); z-index: 100; text-align: center; min-width: 300px; }
+        .rank-item { font-size: 18px; margin: 10px 0; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px; display: flex; justify-content: space-between; }
+        .rank-winner { font-size: 22px; color: #fbc531; font-weight: bold; border: 1px solid #fbc531; }
+    </style>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+
+    <div id="lobby-container" class="panel">
+        <h1>🐍 Snake Royale</h1>
+        <input type="text" id="nickInput" placeholder="Tu Nickname (Ej: Mamba)" maxlength="12"><br><br>
+        
+        <button onclick="createRoom()">Crear Nueva Sala</button>
+        <hr style="border-color: #718093; margin: 25px 0;">
+        
+        <input type="text" id="roomCodeInput" placeholder="Código de la sala" maxlength="5" style="text-transform: uppercase;">
+        <button onclick="joinRoom()">Unirse a Sala</button>
+        
+        <div id="room-info" style="display:none; margin-top: 30px; background: rgba(0,0,0,0.2); padding: 20px; border-radius: 8px;">
+            <h2 style="margin-top:0;">Sala: <span id="displayRoomCode" style="color:#fbc531;"></span></h2>
+            <h3>Jugadores en sala:</h3>
+            <ul id="playerList" style="list-style: none; padding: 0; font-size: 18px;"></ul>
+            <button id="startBtn" onclick="startGame()" class="btn-green" style="display:none; margin-top: 15px; width: 100%;">Iniciar Partida</button>
+        </div>
+    </div>
+
+    <div id="game-container">
+        <h2 style="margin-bottom: 10px;">Sala: <span id="gameRoomCode"></span> | ¡No choques con el metal ni con otros! </h2>
+        
+        <div id="game-over-modal">
+            <h1 style="margin-top: 0; color: #fbc531;">🏆 ¡Partida Terminada! 🏆</h1>
+            <div id="leaderboard" style="margin: 20px 0;"></div>
+            <button onclick="location.reload()" style="margin-top: 20px;">Volver al Menú</button>
+        </div>
+
+        <canvas id="gameCanvas" width="600" height="600"></canvas>
+    </div>
+
+    <script>
+        // CAMBIA ESTO POR TU URL DE RENDER (ej: https://tu-juego.onrender.com)
+        const socket = io('https://snakesex.onrender.com'); 
+        // const socket = io('http://localhost:5000'); // Úsalo así si pruebas localmente en tu computadora
+        
+        const blockSize = 15;
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let currentRoom = null;
+
+        function getNick() {
+            let nick = document.getElementById('nickInput').value.trim();
+            return nick ? nick : 'Anónimo' + Math.floor(Math.random()*100);
+        }
+
+        // --- LÓGICA DE SALAS ---
+        function createRoom() {
+            socket.emit('create_room', {nick: getNick()});
+        }
+
+        function joinRoom() {
+            const code = document.getElementById('roomCodeInput').value;
+            if(code) socket.emit('join_room', {room: code, nick: getNick()});
+        }
+
+        function startGame() {
+            socket.emit('start_game', {room: currentRoom});
+        }
+
+        // --- EVENTOS DEL SERVIDOR ---
+        socket.on('room_created', data => {
+            currentRoom = data.room;
+            showRoomLobby(data.room);
+            document.getElementById('startBtn').style.display = 'inline-block';
+        });
+
+        socket.on('room_joined', data => {
+            currentRoom = data.room;
+            showRoomLobby(data.room);
+        });
+
+        socket.on('update_lobby', data => {
+            const list = document.getElementById('playerList');
+            list.innerHTML = '';
+            data.players.forEach(p => {
+                let li = document.createElement('li');
+                li.innerText = '👤 ' + p;
+                list.appendChild(li);
+            });
+        });
+
+        socket.on('game_started', () => {
+            document.getElementById('lobby-container').style.display = 'none';
+            document.getElementById('game-container').style.display = 'block';
+            document.getElementById('gameRoomCode').innerText = currentRoom;
+        });
+
+        socket.on('error', data => { alert(data.msg); });
+
+        // --- DIBUJAR JUEGO CON NUEVA ESTÉTICA ---
+        socket.on('game_state', state => {
+            // Limpiar lienzo
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Dibujar obstáculos METÁLICOS industriales
+            state.obstacles.forEach(obs => {
+                const x = obs.x * blockSize;
+                const y = obs.y * blockSize;
+                
+                // Gradiente para efecto de metal pulido
+                let grad = ctx.createLinearGradient(x, y, x + blockSize, y + blockSize);
+                grad.addColorStop(0, '#bdc3c7'); // Gris claro
+                grad.addColorStop(0.5, '#7f8c8d'); // Gris oscuro
+                grad.addColorStop(1, '#bdc3c7'); // Gris claro
+                
+                ctx.fillStyle = grad;
+                ctx.fillRect(x, y, blockSize, blockSize);
+                
+                // Detalles industriales (remaches/puntos en las esquinas)
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(x + 2, y + 2, 2, 2);
+                ctx.fillRect(x + blockSize - 4, y + 2, 2, 2);
+                ctx.fillRect(x + 2, y + blockSize - 4, 2, 2);
+                ctx.fillRect(x + blockSize - 4, y + blockSize - 4, 2, 2);
+                
+                // Borde metálico exterior
+                ctx.strokeStyle = '#34495e';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x, y, blockSize, blockSize);
+            });
+
+            // 2. Dibujar MANZANAS (comida realista)
+            state.foods.forEach(food => {
+                const cx = food.x * blockSize + blockSize/2;
+                const cy = food.y * blockSize + blockSize/2;
+                const r = blockSize/2 * 0.8; // Radio de la manzana
+
+                // Tallo (Marrón)
+                ctx.fillStyle = '#8e44ad';
+                ctx.fillRect(cx - 1, cy - r - 2, 2, 4);
+
+                // Cuerpo de la manzana (Rojo gradiente)
+                let grad = ctx.createRadialGradient(cx, cy, 1, cx, cy, r);
+                grad.addColorStop(0, '#ff7675'); // Centro claro
+                grad.addColorStop(1, '#e84118'); // Exterior oscuro
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Hoja (Verde)
+                ctx.fillStyle = '#2ecc71';
+                ctx.beginPath();
+                ctx.moveTo(cx + 1, cy - r + 1);
+                ctx.lineTo(cx + 5, cy - r - 3);
+                ctx.lineTo(cx + 1, cy - r - 5);
+                ctx.fill();
+            });
+
+            // 3. Dibujar jugadores (Serpientes redondas con nick)
+            for (let id in state.players) {
+                let player = state.players[id];
+                if (!player.is_alive) continue;
+
+                player.body.forEach((part, index) => {
+                    ctx.fillStyle = player.color;
+                    ctx.beginPath();
+                    // Aspecto de serpiente redondeada
+                    ctx.arc(part.x * blockSize + blockSize/2, part.y * blockSize + blockSize/2, blockSize/2 * 0.9, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Brillo en el cuerpo para efecto 3D
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                    ctx.beginPath();
+                    ctx.arc(part.x * blockSize + blockSize/2 - 2, part.y * blockSize + blockSize/2 - 2, blockSize/2 * 0.4, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // La cabeza tiene un distintivo blanco
+                    if (index === 0) {
+                        ctx.fillStyle = '#ffffff'; 
+                        ctx.beginPath();
+                        ctx.arc(part.x * blockSize + blockSize/2, part.y * blockSize + blockSize/2, blockSize/2 * 0.3, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                });
+                
+                // Dibujar el Nickname encima de la serpiente
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(player.nick, player.body[0].x * blockSize + blockSize/2, player.body[0].y * blockSize - 5);
+            }
+        });
+
+        // --- FIN DEL JUEGO: Tabla de posiciones ---
+        socket.on('game_over', data => {
+            const modal = document.getElementById('game-over-modal');
+            const leaderboard = document.getElementById('leaderboard');
+            leaderboard.innerHTML = ''; // Limpiar previo
+
+            data.rankings.forEach((player, index) => {
+                let div = document.createElement('div');
+                div.className = 'rank-item';
+                if(player.winner) {
+                    div.classList.add('rank-winner');
+                    div.innerHTML = `<span>👑 1. ${player.nick}</span> <span>${player.score} pts</span>`;
+                } else {
+                    div.innerHTML = `<span>${index + 1}. ${player.nick}</span> <span>${player.score} pts</span>`;
+                }
+                leaderboard.appendChild(div);
+            });
+
+            modal.style.display = 'block';
+        });
+
+        // --- CONTROLES (Manejo de teclas) ---
+        document.addEventListener('keydown', e => {
+            if (!currentRoom) return;
+            const dirMap = {
+                'ArrowUp': 'up', 'w': 'up', 'W': 'up',
+                'ArrowDown': 'down', 's': 'down', 'S': 'down',
+                'ArrowLeft': 'left', 'a': 'left', 'A': 'left',
+                'ArrowRight': 'right', 'd': 'right', 'D': 'right'
+            };
+            if (dirMap[e.key]) {
+                // Evitar scroll con las flechas del teclado
+                if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+                socket.emit('change_dir', {room: currentRoom, dir: dirMap[e.key]});
+            }
+        });
+
+        function showRoomLobby(roomCode) {
+            document.getElementById('displayRoomCode').innerText = roomCode;
+            document.getElementById('room-info').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
