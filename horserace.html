@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Hipódromo en Tiempo Real</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; padding: 20px; display: flex; gap: 20px; }
+        .panel { background: #1e1e1e; padding: 20px; border-radius: 12px; border: 1px solid #333; }
+        .chat-panel { width: 320px; display: flex; flex-direction: column; }
+        .game-panel { flex-grow: 1; }
+        
+        #chat-box { height: 350px; overflow-y: auto; background: #151515; padding: 12px; margin-bottom: 10px; border-radius: 6px; border: 1px solid #252525; }
+        .msg { margin-bottom: 6px; font-size: 0.95em; line-height: 1.4; }
+        .msg span { font-weight: bold; color: #81c784; }
+        
+        input, button, select { padding: 10px; margin: 6px 0; border: 1px solid #444; border-radius: 6px; background: #2a2a2a; color: white; width: 100%; box-sizing: border-box; }
+        button { background: #388e3c; color: white; cursor: pointer; font-weight: bold; border: none; transition: 0.2s; }
+        button:hover { background: #4caf50; }
+        .btn-secondary { background: #0288d1; }
+        .btn-secondary:hover { background: #03a9f4; }
+        
+        .code-display { background: #333; padding: 10px; text-align: center; font-size: 1.4em; font-weight: bold; letter-spacing: 2px; border-radius: 6px; color: #ffeb3b; margin: 10px 0; }
+        
+        .track { background: #2e251b; margin: 12px 0; border-radius: 6px; position: relative; height: 45px; border-right: 8px solid #fff; }
+        .horse { height: 100%; width: 45px; border-radius: 50%; position: absolute; left: 0; transition: left 0.4s linear; display: flex; align-items: center; justify-content: center; font-weight: bold; color: black; }
+        #caballo-Rojo { background: #ff5252; }
+        #caballo-Azul { background: #448aff; }
+        #caballo-Verde { background: #69f0ae; }
+        #caballo-Amarillo { background: #ffd740; }
+        
+        .hidden { display: none !important; }
+        .flex-group { display: flex; gap: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="panel chat-panel">
+        <div id="login-section">
+            <h3>Identificación</h3>
+            <input type="text" id="nick-input" placeholder="Tu Apodo / Nickname">
+            <button onclick="setNickname()">Establecer Nick</button>
+        </div>
+        
+        <div id="lobby-section" class="hidden">
+            <h3>Chat de la Sala</h3>
+            <div id="chat-box"></div>
+            <div class="flex-group">
+                <input type="text" id="chat-input" placeholder="Escribe algo..." onkeypress="if(event.key==='Enter') sendMessage()">
+                <button onclick="sendMessage()" style="width: auto;">✈</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel game-panel hidden" id="game-section">
+        
+        <div id="room-controls">
+            <h3>Panel de Carreras</h3>
+            <p>Crea un evento nuevo o únete a uno existente usando su código de acceso.</p>
+            <button class="btn-secondary" onclick="createRoom()">➕ Crear Nueva Sala (Ser Anfitrión)</button>
+            <div style="margin: 20px 0; text-align: center; color: #666;">— O —</div>
+            <div class="flex-group">
+                <input type="text" id="room-input" placeholder="Código de sala (Ej: AB12X)" style="text-transform: uppercase;">
+                <button onclick="joinRoom()">Unirse como Espectador</button>
+            </div>
+        </div>
+
+        <div id="race-section" class="hidden">
+            <h2>Panel de Control del Evento</h2>
+            <div class="code-display" id="display-code">CÓDIGO: -----</div>
+            <p style="text-align: center; color: #aaa; margin-top: -5px;">Comparte este código con los espectadores para que se conecten</p>
+            
+            <div id="betting-controls">
+                <label>Elige tu caballo favorito:</label>
+                <select id="color-select">
+                    <option value="Rojo">🔴 Caballo Rojo</option>
+                    <option value="Azul">🔵 Caballo Azul</option>
+                    <option value="Verde">🟢 Caballo Verde</option>
+                    <option value="Amarillo">🟡 Caballo Amarillo</option>
+                </select>
+                <button onclick="placeBet()">Registrar Mi Apuesta</button>
+                
+                <button id="admin-start-btn" onclick="startRace()" style="background: #d32f2f; margin-top: 15px;" class="hidden">🏁 ¡INICIAR CARRERA!</button>
+            </div>
+
+            <div id="bets-list" style="margin: 15px 0; background: #151515; padding: 10px; border-radius: 6px; font-size: 0.9em;"></div>
+
+            <div class="tracks">
+                <div class="track"><div id="caballo-Rojo" class="horse">🔴</div></div>
+                <div class="track"><div id="caballo-Azul" class="horse">🔵</div></div>
+                <div class="track"><div id="caballo-Verde" class="horse">🟢</div></div>
+                <div class="track"><div id="caballo-Amarillo" class="horse">🟡</div></div>
+            </div>
+            <h3 id="race-result" style="text-align: center; margin-top: 20px; color: #ffeb3b;"></h3>
+        </div>
+    </div>
+
+    <script>
+        // REMPLAZAR CON TU URL DE RENDER AL DESPLEGAR
+        const SERVER_URL = "https://caballos-xlkw.onrender.com"; 
+        const socket = io(SERVER_URL);
+        let currentRoomCode = "";
+        let isCreator = false;
+
+        // Asignación de Nickname
+        function setNickname() {
+            const nick = document.getElementById('nick-input').value.trim();
+            if(!nick) return;
+            socket.emit('set_nick', { nick: nick });
+            
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('lobby-section').classList.remove('hidden');
+            document.getElementById('game-section').classList.remove('hidden');
+        }
+
+        // Enviar mensajes al chat
+        function sendMessage() {
+            const text = document.getElementById('chat-input').value.trim();
+            if(!text) return;
+            socket.emit('chat_msg', { text: text });
+            document.getElementById('chat-input').value = '';
+        }
+
+        socket.on('chat_msg', (data) => {
+            const box = document.getElementById('chat-box');
+            box.innerHTML += `<div class="msg"><span>${data.user}:</span> ${data.msg}</div>`;
+            box.scrollTop = box.scrollHeight;
+        });
+
+        // Acciones de Sala
+        function createRoom() {
+            socket.emit('create_room');
+        }
+
+        function joinRoom() {
+            const code = document.getElementById('room-input').value.trim();
+            if(!code) return;
+            socket.emit('join_room', { room: code });
+        }
+
+        // Respuesta del Servidor al intentar entrar/crear sala
+        socket.on('room_response', (data) => {
+            currentRoomCode = data.room;
+            isCreator = data.is_creator;
+            
+            document.getElementById('room-controls').classList.add('hidden');
+            document.getElementById('race-section').classList.remove('hidden');
+            document.getElementById('display-code').innerText = `CÓDIGO DE SALA: ${currentRoomCode}`;
+            
+            // Si es creador, habilitar el botón de inicio de carrera
+            if(isCreator) {
+                document.getElementById('admin-start-btn').classList.remove('hidden');
+            } else {
+                document.getElementById('admin-start-btn').classList.add('hidden');
+            }
+            
+            document.getElementById('bets-list').innerHTML = "<strong>Apuestas en esta sala:</strong>";
+            document.getElementById('race-result').innerText = "";
+            resetPositions();
+        });
+
+        function placeBet() {
+            const color = document.getElementById('color-select').value;
+            socket.emit('place_bet', { room: currentRoomCode, color: color });
+        }
+
+        function startRace() {
+            socket.emit('start_race', { room: currentRoomCode });
+        }
+
+        // Manejo de Alertas / Errores
+        socket.on('error_msg', (data) => {
+            alert(data.msg);
+        });
+
+        // Eventos del Ciclo de Carrera
+        socket.on('bet_placed', (data) => {
+            document.getElementById('bets-list').innerHTML += `<br>🏇 ${data.nick} respaldó al color ${data.color}`;
+        });
+
+        socket.on('race_started', () => {
+            document.getElementById('race-result').innerText = "🏁 ¡Los caballos han salido de las gateras!";
+            resetPositions();
+        });
+
+        socket.on('race_update', (progress) => {
+            for (const [color, p] of Object.entries(progress)) {
+                const pos = Math.min(p, 100);
+                // Ajuste visual simple para que el círculo no desborde la meta
+                document.getElementById(`caballo-${color}`).style.left = `calc(${pos}% - ${pos === 100 ? 45 : 0}px)`;
+            }
+        });
+
+        socket.on('race_finished', (data) => {
+            let msg = `🎉 ¡El caballo ${data.winner} cruzó la meta primero!<br><br>`;
+            if (data.bet_winners.length > 0) {
+                msg += `🏆 Ganadores de la ronda: ${data.bet_winners.join(', ')}`;
+            } else {
+                msg += `💸 La casa gana. Nadie apostó por este color.`;
+            }
+            document.getElementById('race-result').innerHTML = msg;
+        });
+
+        function resetPositions() {
+            const colors = ['Rojo', 'Azul', 'Verde', 'Amarillo'];
+            colors.forEach(c => document.getElementById(`caballo-${c}`).style.left = '0');
+        }
+    </script>
+</body>
+</html>
