@@ -16,9 +16,13 @@
         
         input, button, select { padding: 10px; margin: 6px 0; border: 1px solid #444; border-radius: 6px; background: #2a2a2a; color: white; width: 100%; box-sizing: border-box; }
         button { background: #388e3c; color: white; cursor: pointer; font-weight: bold; border: none; transition: 0.2s; }
-        button:hover { background: #4caf50; }
+        button:hover:not(:disabled) { background: #4caf50; }
+        
+        /* ESTILO PARA BOTONES DESHABILITADOS */
+        button:disabled, select:disabled { background: #444; color: #888; cursor: not-allowed; border-color: #333; }
+        
         .btn-secondary { background: #0288d1; }
-        .btn-secondary:hover { background: #03a9f4; }
+        .btn-secondary:hover:not(:disabled) { background: #03a9f4; }
         
         .code-display { background: #333; padding: 10px; text-align: center; font-size: 1.4em; font-weight: bold; letter-spacing: 2px; border-radius: 6px; color: #ffeb3b; margin: 10px 0; }
         
@@ -85,7 +89,8 @@
                     <option value="Morado">🟣 Morado</option>
                     <option value="Blanco">⚪ Blanco</option>
                 </select>
-                <button onclick="placeBet()">Registrar Mi Apuesta</button>
+                <button id="bet-btn" onclick="placeBet()">Registrar Mi Apuesta</button>
+                
                 <button id="admin-start-btn" onclick="startRace()" style="background: #d32f2f; margin-top: 15px;" class="hidden">🏁 ¡INICIAR CARRERA!</button>
             </div>
 
@@ -105,8 +110,8 @@
     </div>
 
     <script>
-        // ¡IMPORTANTE! REMPLAZAR CON TU URL DE RENDER AL DESPLEGAR
-        const SERVER_URL = "https://caballos-xlkw.onrender.com"; 
+        // ¡IMPORTANTE! REMPLAZAR CON TU URL DE RENDER
+        const SERVER_URL = "http://localhost:5000"; 
         const socket = io(SERVER_URL);
         
         let currentRoomCode = "";
@@ -162,6 +167,7 @@
             document.getElementById('bets-list').innerHTML = "<strong>Apuestas en esta sala:</strong>";
             document.getElementById('race-result').innerText = "";
             resetPositions();
+            enableBetting(); // Asegurar que los botones estén activos al entrar
         });
 
         function placeBet() {
@@ -181,8 +187,21 @@
             document.getElementById('bets-list').innerHTML += `<br>🏇 ${data.nick} respaldó al caballo ${data.color}`;
         });
 
+        // NUEVO: Bloquear UI cuando el servidor acepta la apuesta
+        socket.on('bet_accepted', (data) => {
+            document.getElementById('bet-btn').disabled = true;
+            document.getElementById('color-select').disabled = true;
+            document.getElementById('bet-btn').innerText = `Apuesta Confirmada: ${data.color}`;
+        });
+
         socket.on('race_started', () => {
             document.getElementById('race-result').innerText = "🏁 ¡Los caballos han salido de las gateras!";
+            // Por seguridad, bloquear apuestas a todos si empezó la carrera
+            document.getElementById('bet-btn').disabled = true;
+            document.getElementById('color-select').disabled = true;
+            if (isCreator) {
+                document.getElementById('admin-start-btn').disabled = true;
+            }
             resetPositions();
         });
 
@@ -204,7 +223,21 @@
                 msg += `💸 La casa gana. Nadie apostó por este caballo.`;
             }
             document.getElementById('race-result').innerHTML = msg;
+            
+            // NUEVO: Reactivar botones para la próxima ronda
+            enableBetting();
+            if (isCreator) {
+                document.getElementById('admin-start-btn').disabled = false;
+            }
         });
+
+        function enableBetting() {
+            document.getElementById('bet-btn').disabled = false;
+            document.getElementById('color-select').disabled = false;
+            document.getElementById('bet-btn').innerText = "Registrar Mi Apuesta";
+            // Limpiar la lista de apuestas visualmente
+            document.getElementById('bets-list').innerHTML = "<strong>Apuestas en esta sala:</strong>";
+        }
 
         function resetPositions() {
             const colors = ['Rojo', 'Azul', 'Verde', 'Amarillo', 'Naranja', 'Morado', 'Blanco'];
