@@ -22,12 +22,16 @@
         
         .code-display { background: #333; padding: 10px; text-align: center; font-size: 1.4em; font-weight: bold; letter-spacing: 2px; border-radius: 6px; color: #ffeb3b; margin: 10px 0; }
         
-        .track { background: #2e251b; margin: 12px 0; border-radius: 6px; position: relative; height: 45px; border-right: 8px solid #fff; }
-        .horse { height: 100%; width: 45px; border-radius: 50%; position: absolute; left: 0; transition: left 0.4s linear; display: flex; align-items: center; justify-content: center; font-weight: bold; color: black; }
-        #caballo-Rojo { background: #ff5252; }
-        #caballo-Azul { background: #448aff; }
-        #caballo-Verde { background: #69f0ae; }
-        #caballo-Amarillo { background: #ffd740; }
+        .track { background: #4a3b2c; margin: 10px 0; border-radius: 4px; position: relative; height: 45px; border-right: 8px solid #fff; border-bottom: 2px dashed #333; }
+        .horse { height: 100%; width: 45px; position: absolute; left: 0; transition: left 0.4s linear; display: flex; align-items: center; justify-content: center; font-size: 35px; border-bottom: 4px solid; }
+        
+        #caballo-Rojo { border-color: #ff5252; }
+        #caballo-Azul { border-color: #448aff; }
+        #caballo-Verde { border-color: #69f0ae; }
+        #caballo-Amarillo { border-color: #ffd740; }
+        #caballo-Naranja { border-color: #ff9800; }
+        #caballo-Morado { border-color: #9c27b0; }
+        #caballo-Blanco { border-color: #ffffff; }
         
         .hidden { display: none !important; }
         .flex-group { display: flex; gap: 10px; }
@@ -73,36 +77,41 @@
             <div id="betting-controls">
                 <label>Elige tu caballo favorito:</label>
                 <select id="color-select">
-                    <option value="Rojo">🔴 Caballo Rojo</option>
-                    <option value="Azul">🔵 Caballo Azul</option>
-                    <option value="Verde">🟢 Caballo Verde</option>
-                    <option value="Amarillo">🟡 Caballo Amarillo</option>
+                    <option value="Rojo">🔴 Rojo</option>
+                    <option value="Azul">🔵 Azul</option>
+                    <option value="Verde">🟢 Verde</option>
+                    <option value="Amarillo">🟡 Amarillo</option>
+                    <option value="Naranja">🟠 Naranja</option>
+                    <option value="Morado">🟣 Morado</option>
+                    <option value="Blanco">⚪ Blanco</option>
                 </select>
                 <button onclick="placeBet()">Registrar Mi Apuesta</button>
-                
                 <button id="admin-start-btn" onclick="startRace()" style="background: #d32f2f; margin-top: 15px;" class="hidden">🏁 ¡INICIAR CARRERA!</button>
             </div>
 
             <div id="bets-list" style="margin: 15px 0; background: #151515; padding: 10px; border-radius: 6px; font-size: 0.9em;"></div>
 
             <div class="tracks">
-                <div class="track"><div id="caballo-Rojo" class="horse">🔴</div></div>
-                <div class="track"><div id="caballo-Azul" class="horse">🔵</div></div>
-                <div class="track"><div id="caballo-Verde" class="horse">🟢</div></div>
-                <div class="track"><div id="caballo-Amarillo" class="horse">🟡</div></div>
+                <div class="track"><div id="caballo-Rojo" class="horse">🏇</div></div>
+                <div class="track"><div id="caballo-Azul" class="horse">🏇</div></div>
+                <div class="track"><div id="caballo-Verde" class="horse">🏇</div></div>
+                <div class="track"><div id="caballo-Amarillo" class="horse">🏇</div></div>
+                <div class="track"><div id="caballo-Naranja" class="horse">🏇</div></div>
+                <div class="track"><div id="caballo-Morado" class="horse">🏇</div></div>
+                <div class="track"><div id="caballo-Blanco" class="horse">🏇</div></div>
             </div>
             <h3 id="race-result" style="text-align: center; margin-top: 20px; color: #ffeb3b;"></h3>
         </div>
     </div>
 
     <script>
-        // REMPLAZAR CON TU URL DE RENDER AL DESPLEGAR
+        // ¡IMPORTANTE! REMPLAZAR CON TU URL DE RENDER AL DESPLEGAR
         const SERVER_URL = "https://caballos-xlkw.onrender.com"; 
         const socket = io(SERVER_URL);
+        
         let currentRoomCode = "";
         let isCreator = false;
 
-        // Asignación de Nickname
         function setNickname() {
             const nick = document.getElementById('nick-input').value.trim();
             if(!nick) return;
@@ -113,7 +122,6 @@
             document.getElementById('game-section').classList.remove('hidden');
         }
 
-        // Enviar mensajes al chat
         function sendMessage() {
             const text = document.getElementById('chat-input').value.trim();
             if(!text) return;
@@ -127,7 +135,6 @@
             box.scrollTop = box.scrollHeight;
         });
 
-        // Acciones de Sala
         function createRoom() {
             socket.emit('create_room');
         }
@@ -138,7 +145,6 @@
             socket.emit('join_room', { room: code });
         }
 
-        // Respuesta del Servidor al intentar entrar/crear sala
         socket.on('room_response', (data) => {
             currentRoomCode = data.room;
             isCreator = data.is_creator;
@@ -147,7 +153,6 @@
             document.getElementById('race-section').classList.remove('hidden');
             document.getElementById('display-code').innerText = `CÓDIGO DE SALA: ${currentRoomCode}`;
             
-            // Si es creador, habilitar el botón de inicio de carrera
             if(isCreator) {
                 document.getElementById('admin-start-btn').classList.remove('hidden');
             } else {
@@ -168,14 +173,12 @@
             socket.emit('start_race', { room: currentRoomCode });
         }
 
-        // Manejo de Alertas / Errores
         socket.on('error_msg', (data) => {
             alert(data.msg);
         });
 
-        // Eventos del Ciclo de Carrera
         socket.on('bet_placed', (data) => {
-            document.getElementById('bets-list').innerHTML += `<br>🏇 ${data.nick} respaldó al color ${data.color}`;
+            document.getElementById('bets-list').innerHTML += `<br>🏇 ${data.nick} respaldó al caballo ${data.color}`;
         });
 
         socket.on('race_started', () => {
@@ -186,8 +189,10 @@
         socket.on('race_update', (progress) => {
             for (const [color, p] of Object.entries(progress)) {
                 const pos = Math.min(p, 100);
-                // Ajuste visual simple para que el círculo no desborde la meta
-                document.getElementById(`caballo-${color}`).style.left = `calc(${pos}% - ${pos === 100 ? 45 : 0}px)`;
+                const caballo = document.getElementById(`caballo-${color}`);
+                if(caballo) {
+                    caballo.style.left = `calc(${pos}% - ${pos === 100 ? 45 : 0}px)`;
+                }
             }
         });
 
@@ -196,14 +201,17 @@
             if (data.bet_winners.length > 0) {
                 msg += `🏆 Ganadores de la ronda: ${data.bet_winners.join(', ')}`;
             } else {
-                msg += `💸 La casa gana. Nadie apostó por este color.`;
+                msg += `💸 La casa gana. Nadie apostó por este caballo.`;
             }
             document.getElementById('race-result').innerHTML = msg;
         });
 
         function resetPositions() {
-            const colors = ['Rojo', 'Azul', 'Verde', 'Amarillo'];
-            colors.forEach(c => document.getElementById(`caballo-${c}`).style.left = '0');
+            const colors = ['Rojo', 'Azul', 'Verde', 'Amarillo', 'Naranja', 'Morado', 'Blanco'];
+            colors.forEach(c => {
+                const caballo = document.getElementById(`caballo-${c}`);
+                if(caballo) caballo.style.left = '0';
+            });
         }
     </script>
 </body>
