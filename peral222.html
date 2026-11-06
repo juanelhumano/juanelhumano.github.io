@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Posada Peral 222 - Intercambio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&family=Quicksand:wght@400;600&display=swap');
+
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background-color: #f8fafc;
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        h1, h2, h3, .christmas-font { font-family: 'Mountains of Christmas', cursive; }
+
+        .toast {
+            position: fixed;
+            bottom: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            border-radius: 50px;
+            color: white;
+            font-weight: 600;
+            transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 50;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
+            width: max-content;
+            max-width: 90vw;
+        }
+        .toast.show { bottom: 30px; }
+        .toast-success { background: #16a34a; }
+        .toast-error { background: #dc2626; }
+
+        .snow-container {
+            position: relative;
+            width: 100%;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border: 4px solid white;
+            background-color: #0f172a;
+        }
+        .snow {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 10;
+            background-image: 
+                radial-gradient(4px 4px at 100px 50px, #fff , transparent),
+                radial-gradient(6px 6px at 200px 150px, #fff, transparent),
+                radial-gradient(3px 3px at 300px 250px, #fff, transparent),
+                radial-gradient(5px 5px at 400px 350px, #fff, transparent),
+                radial-gradient(4px 4px at 50px 200px, #fff, transparent),
+                radial-gradient(6px 6px at 150px 300px, #fff, transparent),
+                radial-gradient(3px 3px at 250px 400px, #fff, transparent),
+                radial-gradient(5px 5px at 350px 500px, #fff, transparent);
+            background-size: 500px 500px;
+            animation: snow 4s linear infinite;
+        }
+        @keyframes snow {
+            0% { background-position: 0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px, 0px 0px; }
+            100% { background-position: 500px 500px, 400px 400px, 300px 500px, 200px 400px, 100px 500px, 500px 400px, 400px 500px, 300px 400px; }
+        }
+    </style>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Navbar -->
+    <nav class="bg-white shadow-sm px-4 py-4 w-full sticky top-0 z-40">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl md:text-2xl font-bold text-red-600 tracking-wide leading-tight">
+                <i class="fas fa-sleigh mr-2"></i> POSADA PERAL 222,<br class="md:hidden"> DURITO ROCKY Y BOLO FREE
+            </h1>
+            <button id="btn-logout" class="hidden text-sm bg-red-100 text-red-700 px-4 py-2 rounded-full font-bold hover:bg-red-200 transition shadow-sm">
+                <i class="fas fa-sign-out-alt mr-1"></i> Salir
+            </button>
+        </div>
+    </nav>
+
+    <main class="flex-grow flex flex-col items-center p-4 w-full max-w-4xl mx-auto">
+        
+        <!-- SECCIÓN DE AUTENTICACIÓN -->
+        <div id="auth-section" class="w-full max-w-md flex flex-col flex-grow">
+            <div class="bg-white p-6 md:p-8 rounded-2xl shadow-xl border border-red-100 mt-4 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-red-500 to-green-500"></div>
+                <h2 id="auth-title" class="text-3xl text-center mb-6 text-slate-800">Iniciar Sesión</h2>
+                
+                <form id="auth-form" class="space-y-4">
+                    <div id="register-fields" class="hidden space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-600 mb-1">Nombre completo</label>
+                            <input type="text" id="name" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Ej. Ramón Guerrero">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-600 mb-1">Fecha de nacimiento</label>
+                            <input type="date" id="dob" min="1950-01-01" max="2010-12-31" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-600 mb-1">Pregunta de seguridad</label>
+                            <select id="security-q" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none mb-2">
+                                <option value="mascota">Nombre de tu primera mascota</option>
+                                <option value="ciudad">Ciudad donde naciste</option>
+                                <option value="color">Color favorito</option>
+                            </select>
+                            <input type="text" id="security-a" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Respuesta secreta">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-600 mb-1">Correo electrónico</label>
+                        <input type="email" id="email" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="tu@correo.com">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-600 mb-1">Contraseña</label>
+                        <input type="password" id="password" required minlength="6" maxlength="20" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Mínimo 6 caracteres">
+                    </div>
+                    <button type="submit" class="w-full bg-gradient-to-r from-red-600 to-red-500 text-white p-3 rounded-xl font-bold hover:shadow-lg transition">Entrar</button>
+                </form>
+                <p class="text-center mt-6 text-sm text-slate-500">
+                    <span id="auth-toggle-text">¿No tienes cuenta?</span>
+                    <button id="toggle-auth" class="text-red-600 font-bold hover:underline ml-1">Regístrate aquí</button>
+                </p>
+            </div>
+
+            <div class="w-full mt-auto pt-8 pb-4">
+                <div class="snow-container">
+                    <img src="https://i.ibb.co/FpvV1ph/peral-222.png" alt="Imagen de la Posada" class="w-full h-auto object-cover opacity-90">
+                    <div class="snow"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN DE LA APLICACIÓN -->
+        <div id="app-section" class="hidden w-full max-w-2xl mt-4">
+            
+            <div class="mb-4">
+                <h2 class="text-3xl text-green-700">¡Hola, <span id="display-name" class="text-red-600">Usuario</span>!</h2>
+            </div>
+
+            <!-- 1. PANTALLA CREAR INTERCAMBIO (Solo si no existe uno) -->
+            <div id="create-exchange-section" class="hidden bg-white p-8 rounded-2xl shadow-md border border-slate-100 mb-6 text-center">
+                <i class="fas fa-calendar-plus text-5xl text-blue-500 mb-4"></i>
+                <h3 class="text-2xl text-slate-800 mb-2 font-bold christmas-font">Crear Intercambio Navideño</h3>
+                <p class="text-slate-600 mb-6 text-sm">Aún no hay ningún intercambio activo. ¡Crea uno e invita a los demás!</p>
+                
+                <form id="create-exchange-form" class="space-y-4 text-left">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-600 mb-1">Fecha del evento</label>
+                        <input type="date" id="exchange-date" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-400">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-600 mb-1">Hora del evento</label>
+                        <input type="time" id="exchange-time" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-400">
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 text-white p-3 rounded-xl font-bold hover:bg-blue-700 transition">
+                        Crear Evento y ser el Administrador
+                    </button>
+                </form>
+            </div>
+
+            <!-- 2. PANTALLA PARA UNIRSE AL INTERCAMBIO (Si ya existe uno) -->
+            <div id="join-section" class="hidden bg-white p-8 rounded-2xl shadow-md border border-slate-100 mb-6 text-center relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 text-red-100 text-6xl opacity-30"><i class="fas fa-candy-cane"></i></div>
+                <h3 class="text-3xl text-slate-800 mb-4 font-bold christmas-font relative z-10">¡Estás Invitado!</h3>
+                
+                <div class="bg-slate-50 p-4 rounded-xl mb-6 text-left border border-slate-200 inline-block w-full max-w-sm relative z-10">
+                    <p class="text-slate-700 mb-2"><i class="fas fa-crown text-amber-500 w-5"></i> <strong>Creado por:</strong> <span id="event-creator" class="text-red-600 font-bold"></span></p>
+                    <p class="text-slate-700 mb-2"><i class="fas fa-calendar-alt text-blue-500 w-5"></i> <strong>Fecha:</strong> <span id="event-date"></span></p>
+                    <p class="text-slate-700"><i class="fas fa-clock text-green-500 w-5"></i> <strong>Hora:</strong> <span id="event-time"></span></p>
+                </div>
+
+                <button id="btn-join" class="w-full max-w-sm bg-gradient-to-r from-green-600 to-green-500 text-white px-8 py-3 rounded-xl font-bold text-lg hover:shadow-lg transform hover:-translate-y-1 transition relative z-10">
+                    ¡Sí, quiero unirme! 🎅
+                </button>
+            </div>
+
+            <!-- 3. TARJETA DE LISTA DE DESEOS -->
+            <div id="wishlist-section" class="hidden bg-white p-6 rounded-2xl shadow-md border border-slate-100 mb-6">
+                <p class="text-slate-600 mb-4 font-semibold"><i class="fas fa-clipboard-list text-green-600 mr-2"></i> Tus 3 opciones de regalo (¡Mínimo 1 obligatoria!):</p>
+                <form id="wishlist-form" class="space-y-4">
+                    
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="bg-green-100 text-green-700 w-8 h-8 flex items-center justify-center rounded-lg font-bold">1</span>
+                            <input type="text" id="wish1" required class="flex-1 p-2 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-green-400" placeholder="Ej. Un termo (OBLIGATORIO)">
+                        </div>
+                        <div class="flex items-center gap-2 pl-10">
+                            <span class="text-slate-400"><i class="fas fa-link"></i></span>
+                            <input type="url" id="link1" class="flex-1 p-2 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-green-400 text-sm" placeholder="Enlace de referencia (Opcional)">
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="bg-slate-200 text-slate-700 w-8 h-8 flex items-center justify-center rounded-lg font-bold">2</span>
+                            <input type="text" id="wish2" class="flex-1 p-2 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-slate-400" placeholder="Opción 2 (Opcional)">
+                        </div>
+                        <div class="flex items-center gap-2 pl-10">
+                            <span class="text-slate-400"><i class="fas fa-link"></i></span>
+                            <input type="url" id="link2" class="flex-1 p-2 bg-white border border-slate-200 rounded-lg outline-none text-sm" placeholder="Enlace de referencia (Opcional)">
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="bg-slate-200 text-slate-700 w-8 h-8 flex items-center justify-center rounded-lg font-bold">3</span>
+                            <input type="text" id="wish3" class="flex-1 p-2 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-slate-400" placeholder="Opción 3 (Opcional)">
+                        </div>
+                        <div class="flex items-center gap-2 pl-10">
+                            <span class="text-slate-400"><i class="fas fa-link"></i></span>
+                            <input type="url" id="link3" class="flex-1 p-2 bg-white border border-slate-200 rounded-lg outline-none text-sm" placeholder="Enlace de referencia (Opcional)">
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btn-save-wishes" class="w-full bg-slate-800 text-white p-3 rounded-xl font-bold hover:bg-slate-700 transition">
+                        Guardar mi lista <i class="fas fa-save ml-1"></i>
+                    </button>
+                </form>
+            </div>
+
+            <!-- 4. PANTALLA APARTE DEL RESULTADO (Solo visible al cerrar el evento) -->
+            <div id="draw-section" class="hidden">
+                
+                <!-- Estado Pendiente -->
+                <div id="draw-pending" class="bg-white p-6 rounded-2xl shadow-md border border-slate-200 mb-6 text-center">
+                    <i class="fas fa-lock text-4xl text-slate-300 mb-3"></i>
+                    <h3 class="text-xl text-slate-700 font-bold mb-1">Amigo Secreto Oculto</h3>
+                    <p class="text-slate-500 text-sm">El intercambio aún está abierto. Cuando el creador lo cierre, aquí aparecerá tu asignación.</p>
+                </div>
+
+                <!-- Resultado Final (Pantalla llamativa) -->
+                <div id="draw-result" class="hidden bg-gradient-to-br from-red-600 to-red-800 p-8 rounded-2xl shadow-2xl border-4 border-amber-400 mb-6 text-center text-white relative overflow-hidden">
+                    <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(#fff 2px, transparent 2px); background-size: 20px 20px;"></div>
+                    
+                    <h2 class="text-3xl font-bold mb-2 christmas-font relative z-10 text-amber-300">¡Tu Amigo Secreto es!</h2>
+                    <p class="mb-4 text-red-100 text-sm relative z-10">Mantén esto en secreto 🤫</p>
+                    
+                    <div class="bg-white p-4 rounded-xl shadow-inner mb-6 relative z-10">
+                        <p id="target-name" class="text-3xl font-black text-red-700 uppercase tracking-widest"></p>
+                    </div>
+                    
+                    <div class="text-left bg-black bg-opacity-20 p-5 rounded-xl relative z-10">
+                        <p class="font-bold text-amber-300 mb-3"><i class="fas fa-gift mr-1"></i> Lo que le gustaría recibir:</p>
+                        <ul id="target-wishes" class="space-y-3"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. PANEL DE ADMIN (Solo para el creador) -->
+            <div id="admin-panel" class="hidden bg-slate-900 p-6 rounded-2xl shadow-lg border border-slate-700 text-white mt-8">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-amber-400"><i class="fas fa-crown mr-2"></i> Panel de Creador</h3>
+                    <span class="text-xs bg-slate-700 px-2 py-1 rounded text-slate-300"><i class="fas fa-users"></i> <span id="participant-count" class="font-bold">0</span> Unidos</span>
+                </div>
+                <p class="text-sm text-slate-300 mb-4">Cuando todos se hayan unido, presiona el botón. El sistema repartirá los nombres de forma ciega (Ni tú sabrás a quién le toca a los demás).</p>
+                <button id="btn-close-exchange" class="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white p-3 rounded-xl font-bold hover:shadow-lg transition">
+                    Cerrar Intercambio y Repartir Nombres
+                </button>
+            </div>
+
+        </div>
+    </main>
+
+    <div id="toast" class="toast">Mensaje</div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, getDocs, updateDoc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // === ⚠️ PEGA AQUÍ TU CONFIGURACIÓN (RECUERDA apiKey EN MINÚSCULA) ⚠️ ===
+        const firebaseConfig = {
+            apiKey: "AIzaSyBbU_T9YfSXUQXLIRt0Gcb9LFQDe7TqgMY",
+  authDomain: "posadaperal.firebaseapp.com",
+  projectId: "posadaperal",
+  storageBucket: "posadaperal.firebasestorage.app",
+  messagingSenderId: "685451745067",
+  appId: "1:685451745067:web:6400d7c016ff6bf29d576e"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const sections = {
+            auth: document.getElementById('auth-section'),
+            app: document.getElementById('app-section'),
+            create: document.getElementById('create-exchange-section'),
+            join: document.getElementById('join-section'),
+            wishlist: document.getElementById('wishlist-section'),
+            draw: document.getElementById('draw-section'),
+            admin: document.getElementById('admin-panel')
+        };
+        
+        let isLogin = true;
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast show ${type === 'success' ? 'toast-success' : 'toast-error'}`;
+            setTimeout(() => { toast.classList.remove('show'); }, 4000);
+        }
+
+        // OCULTAR TODAS LAS SECCIONES DE LA APP
+        function hideAppSections() {
+            sections.create.classList.add('hidden');
+            sections.join.classList.add('hidden');
+            sections.wishlist.classList.add('hidden');
+            sections.draw.classList.add('hidden');
+            sections.admin.classList.add('hidden');
+        }
+
+        document.getElementById('toggle-auth').addEventListener('click', () => {
+            isLogin = !isLogin;
+            document.getElementById('auth-title').textContent = isLogin ? 'Iniciar Sesión' : 'Registro';
+            document.getElementById('register-fields').classList.toggle('hidden');
+            document.getElementById('auth-form').querySelector('button').textContent = isLogin ? 'Entrar' : 'Crear Cuenta';
+            document.getElementById('auth-toggle-text').textContent = isLogin ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?';
+            document.getElementById('toggle-auth').textContent = isLogin ? 'Regístrate aquí' : 'Inicia sesión';
+        });
+
+        // AUTENTICACIÓN
+        document.getElementById('auth-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                if (isLogin) {
+                    await signInWithEmailAndPassword(auth, email, password);
+                } else {
+                    const name = document.getElementById('name').value;
+                    if(!name) { showToast("Ingresa tu nombre", "error"); return; }
+                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                    
+                    await setDoc(doc(db, "users", userCredential.user.uid), {
+                        name: name, email: email,
+                        hasJoined: false,
+                        wishes: [ {item:"", link:""}, {item:"", link:""}, {item:"", link:""} ],
+                        targetAssigned: null
+                    });
+                    showToast("Cuenta creada exitosamente.");
+                }
+            } catch (error) {
+                showToast("Error: " + error.message, "error");
+            }
+        });
+
+        document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                sections.auth.classList.add('hidden');
+                sections.app.classList.remove('hidden');
+                document.getElementById('btn-logout').classList.remove('hidden');
+                loadDashboard(user.uid);
+            } else {
+                sections.auth.classList.remove('hidden');
+                sections.app.classList.add('hidden');
+                document.getElementById('btn-logout').classList.add('hidden');
+                document.getElementById('auth-form').reset();
+            }
+        });
+
+        // CONTROLADOR PRINCIPAL DEL DASHBOARD
+        async function loadDashboard(uid) {
+            hideAppSections();
+            
+            // Traer datos del usuario y del intercambio actual simultáneamente
+            const [userSnap, exchangeSnap] = await Promise.all([
+                getDoc(doc(db, "users", uid)),
+                getDoc(doc(db, "exchanges", "main"))
+            ]);
+
+            const userData = userSnap.data();
+            document.getElementById('display-name').textContent = userData.name.split(' ')[0];
+
+            // Cargar la lista de deseos si existe
+            if(userData.wishes && userData.wishes.length > 0) {
+                document.getElementById('wish1').value = userData.wishes[0]?.item || "";
+                document.getElementById('link1').value = userData.wishes[0]?.link || "";
+                document.getElementById('wish2').value = userData.wishes[1]?.item || "";
+                document.getElementById('link2').value = userData.wishes[1]?.link || "";
+                document.getElementById('wish3').value = userData.wishes[2]?.item || "";
+                document.getElementById('link3').value = userData.wishes[2]?.link || "";
+            }
+
+            // LÓGICA DE ESTADOS DEL EVENTO
+            if (!exchangeSnap.exists()) {
+                // 1. NO HAY EVENTO -> Mostrar formulario para crear uno
+                sections.create.classList.remove('hidden');
+            } else {
+                const exchangeData = exchangeSnap.data();
+                
+                if (exchangeData.status === 'open') {
+                    // 2. EVENTO ABIERTO
+                    if (exchangeData.creatorId === uid) {
+                        sections.admin.classList.remove('hidden');
+                        updateParticipantCount();
+                    }
+
+                    if (!userData.hasJoined) {
+                        // No se ha unido
+                        sections.join.classList.remove('hidden');
+                        document.getElementById('event-creator').textContent = exchangeData.creatorName;
+                        document.getElementById('event-date').textContent = exchangeData.date;
+                        document.getElementById('event-time').textContent = exchangeData.time;
+                    } else {
+                        // Ya se unió
+                        sections.wishlist.classList.remove('hidden');
+                        sections.draw.classList.remove('hidden');
+                        document.getElementById('draw-pending').classList.remove('hidden');
+                        document.getElementById('draw-result').classList.add('hidden');
+                    }
+                } else if (exchangeData.status === 'closed') {
+                    // 3. EVENTO CERRADO
+                    if (userData.hasJoined) {
+                        sections.wishlist.classList.remove('hidden');
+                        
+                        // Bloquear botón de guardar para indicar que ya se cerró
+                        document.getElementById('btn-save-wishes').classList.add('opacity-50', 'cursor-not-allowed');
+                        document.getElementById('btn-save-wishes').textContent = 'El intercambio ya está cerrado';
+
+                        // Mostrar resultado en la pantalla aparte
+                        sections.draw.classList.remove('hidden');
+                        document.getElementById('draw-pending').classList.add('hidden');
+                        document.getElementById('draw-result').classList.remove('hidden');
+
+                        if (userData.targetAssigned) {
+                            const targetSnap = await getDoc(doc(db, "users", userData.targetAssigned));
+                            if(targetSnap.exists()) {
+                                const tData = targetSnap.data();
+                                document.getElementById('target-name').textContent = tData.name;
+                                
+                                const ul = document.getElementById('target-wishes');
+                                ul.innerHTML = '';
+                                tData.wishes.forEach((w, index) => {
+                                    if(w.item) {
+                                        let li = `<li class="bg-black bg-opacity-30 p-3 rounded-lg border border-red-500 text-sm"><span class="font-bold text-amber-300 mr-2">${index+1}.</span> ${w.item}`;
+                                        if(w.link) li += `<br><a href="${w.link}" target="_blank" class="text-blue-300 hover:text-blue-200 underline text-xs ml-6 inline-block mt-1"><i class="fas fa-external-link-alt"></i> Ver enlace de referencia</a>`;
+                                        li += `</li>`;
+                                        ul.innerHTML += li;
+                                    }
+                                });
+                            }
+                        }
+                    } else {
+                        // No se unió a tiempo
+                        showToast("El intercambio se cerró y no alcanzaste a unirte.", "error");
+                    }
+                }
+            }
+        }
+
+        // CREAR INTERCAMBIO
+        document.getElementById('create-exchange-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const date = document.getElementById('exchange-date').value;
+            const time = document.getElementById('exchange-time').value;
+            const uid = auth.currentUser.uid;
+            
+            const userSnap = await getDoc(doc(db, "users", uid));
+            
+            try {
+                // Crear el documento global del evento
+                await setDoc(doc(db, "exchanges", "main"), {
+                    date: date,
+                    time: time,
+                    creatorId: uid,
+                    creatorName: userSnap.data().name,
+                    status: 'open'
+                });
+                // Unir automáticamente al creador
+                await updateDoc(doc(db, "users", uid), { hasJoined: true });
+                
+                showToast("¡Intercambio creado! Ya eres participante y administrador.");
+                loadDashboard(uid);
+            } catch (error) {
+                showToast("Error al crear el evento.", "error");
+            }
+        });
+
+        // UNIRSE AL INTERCAMBIO
+        document.getElementById('btn-join').addEventListener('click', async () => {
+            try {
+                await updateDoc(doc(db, "users", auth.currentUser.uid), { hasJoined: true });
+                showToast("¡Te has unido exitosamente!");
+                loadDashboard(auth.currentUser.uid); 
+            } catch(err) {
+                showToast("Error al unirse", "error");
+            }
+        });
+
+        // GUARDAR LISTA DE DESEOS
+        document.getElementById('wishlist-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const exchangeSnap = await getDoc(doc(db, "exchanges", "main"));
+            if(exchangeSnap.exists() && exchangeSnap.data().status === 'closed') {
+                showToast("El intercambio ya está cerrado, no puedes modificar tu lista.", "error");
+                return;
+            }
+
+            const wishes = [
+                { item: document.getElementById('wish1').value, link: document.getElementById('link1').value },
+                { item: document.getElementById('wish2').value, link: document.getElementById('link2').value },
+                { item: document.getElementById('wish3').value, link: document.getElementById('link3').value }
+            ];
+
+            try {
+                await updateDoc(doc(db, "users", auth.currentUser.uid), { wishes: wishes });
+                showToast("¡Lista de deseos guardada!");
+            } catch(err) {
+                showToast("Error al guardar", "error");
+            }
+        });
+
+        // ADMIN: ACTUALIZAR CONTADOR Y SORTEAR
+        async function updateParticipantCount() {
+            const querySnapshot = await getDocs(collection(db, "users"));
+            let count = 0;
+            querySnapshot.forEach(doc => { if(doc.data().hasJoined) count++; });
+            document.getElementById('participant-count').textContent = count;
+        }
+
+        document.getElementById('btn-close-exchange').addEventListener('click', async () => {
+            if(!confirm("¿Estás seguro de cerrar el intercambio? El sistema repartirá los nombres secretamente y ya nadie podrá unirse.")) return;
+
+            try {
+                // Obtener solo a los usuarios que se unieron
+                const querySnapshot = await getDocs(collection(db, "users"));
+                let users = [];
+                querySnapshot.forEach((doc) => {
+                    if(doc.data().hasJoined) { 
+                        users.push({ id: doc.id });
+                    }
+                });
+
+                if(users.length < 3) {
+                    showToast("Se necesitan al menos 3 personas unidas para poder sortear.", "error");
+                    return;
+                }
+
+                // 1. Barajar la lista de usuarios (Algoritmo Fisher-Yates)
+                for (let i = users.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [users[i], users[j]] = [users[j], users[i]];
+                }
+
+                // 2. Asignar en círculo cerrado para que nadie se toque a sí mismo
+                // (El 0 le da al 1, el 1 al 2... y el último le da al 0)
+                const batch = writeBatch(db);
+                for (let i = 0; i < users.length; i++) {
+                    const currentId = users[i].id;
+                    const targetId = i === users.length - 1 ? users[0].id : users[i + 1].id;
+                    batch.update(doc(db, "users", currentId), { targetAssigned: targetId });
+                }
+
+                // 3. Cerrar el evento
+                batch.update(doc(db, "exchanges", "main"), { status: 'closed' });
+
+                // 4. Ejecutar cambios en Firebase de forma ciega
+                await batch.commit();
+                
+                showToast("¡Sorteo realizado con éxito!");
+                loadDashboard(auth.currentUser.uid); // Recarga para ver a quién le tocó al admin
+            } catch(error) {
+                showToast("Error al realizar el sorteo: " + error.message, "error");
+            }
+        });
+
+    </script>
+</body>
+</html>
